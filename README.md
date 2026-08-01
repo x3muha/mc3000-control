@@ -122,18 +122,40 @@ MC3000 Control das Gerät verwendet.
 Eine vollständige Anleitung für ein frisches Raspberry Pi OS Lite 64 Bit steht in
 [INSTALL_RASPBERRY_PI.md](INSTALL_RASPBERRY_PI.md).
 
-Das Release-Archiv auf den Raspberry Pi übertragen, entpacken und im entpackten Ordner
-nur das Installationsskript starten:
+### Variante A: stabiles Release installieren (empfohlen)
+
+Das aktuelle Archiv von der
+[GitHub-Releases-Seite](https://github.com/x3muha/mc3000-control/releases/latest)
+herunterladen, auf den Raspberry Pi übertragen und entpacken. Anschließend im
+entpackten Ordner starten:
 
 ```bash
 ./install.sh
 ```
 
-Es müssen vorher weder Git noch Python, BlueZ oder Python-Pakete eingerichtet werden.
-Das Skript fordert selbstständig Administratorrechte an, installiert alle benötigten
-System- und Python-Abhängigkeiten, aktiviert Bluetooth, richtet einen eigenen
-Systembenutzer sowie eine isolierte Python-Umgebung ein und prüft den gestarteten Dienst.
-Die Oberfläche ist anschließend unter
+Für diesen Weg müssen vorher weder Git noch Python, BlueZ oder Python-Pakete
+eingerichtet werden.
+
+### Variante B: aktuellen Stand mit Git installieren
+
+Wer den jeweils neuesten Stand des Branches `main` verwenden möchte, installiert nur
+Git zum Herunterladen des Repositorys und startet danach dasselbe Installationsskript:
+
+```bash
+sudo apt update
+sudo apt install -y git
+git clone https://github.com/x3muha/mc3000-control.git
+cd mc3000-control
+./install.sh
+```
+
+Das Release ist der empfohlene, fest versionierte Stand. `git clone` kann bereits
+Änderungen enthalten, die noch nicht als Release veröffentlicht wurden.
+
+Bei beiden Varianten fordert das Skript selbstständig Administratorrechte an,
+installiert alle benötigten System- und Python-Abhängigkeiten, aktiviert Bluetooth,
+richtet einen eigenen Systembenutzer sowie eine isolierte Python-Umgebung ein und prüft
+den gestarteten Dienst. Die Oberfläche ist anschließend unter
 `http://<IP-DES-RASPBERRY-PI>:8083/` erreichbar.
 
 Für Debian, Ubuntu, Fedora, Arch Linux und andere Rechner mit Bluetooth LE siehe

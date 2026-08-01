@@ -13,23 +13,60 @@ an SSH public key. Write and verify the image, boot the Pi, then connect:
 ssh <USER>@<HOSTNAME>.local
 ```
 
-## 2. Transfer the release
+## 2. Choose an installation source
 
-Download `mc3000-control-<VERSION>.tar.gz` from the
-[GitHub Releases page](https://github.com/x3muha/mc3000-control/releases), transfer it
-to the Pi and extract it. A graphical SSH client or `scp` from another computer can
-transfer the file. No package needs to be prepared on the Pi.
+MC3000 Control can be installed from a fixed release or directly from the current Git
+revision. The release is recommended for normal use.
+
+### Option A: install a stable release (recommended)
+
+1. Open the
+   [GitHub Releases page](https://github.com/x3muha/mc3000-control/releases/latest) and
+   download `mc3000-control-<VERSION>.tar.gz` from `Assets`. The matching `.sha256` file
+   is optional.
+2. Transfer the archive to the Raspberry Pi. A graphical SSH client can do this, or use
+   `scp` on another computer:
+
+   ```bash
+   scp mc3000-control-<VERSION>.tar.gz <USER>@<HOSTNAME>.local:~/
+   ```
+
+3. On the Raspberry Pi, extract the archive, enter the new directory and run the
+   installer:
+
+   ```bash
+   cd ~
+   tar -xzf mc3000-control-<VERSION>.tar.gz
+   cd mc3000-control-<VERSION>
+   ./install.sh
+   ```
+
+Replace `<VERSION>`, `<USER>` and `<HOSTNAME>` with the actual values. This path does
+not require any package to be prepared on the Pi. If the checksum file was transferred
+as well, verify the archive before extracting it:
+
+```bash
+sha256sum -c mc3000-control-<VERSION>.tar.gz.sha256
+```
+
+### Option B: install the current Git revision
+
+This path downloads the newest revision from the `main` branch, which may be newer than
+the last release. Git is needed only for downloading; `./install.sh` prepares all other
+requirements.
+
+```bash
+sudo apt update
+sudo apt install -y git
+git clone https://github.com/x3muha/mc3000-control.git
+cd mc3000-control
+./install.sh
+```
 
 An operating-system update is recommended but not required. If a kernel or firmware
 update was installed, reboot before continuing.
 
-## 3. Run the installer
-
-Enter the extracted release directory and run exactly:
-
-```bash
-./install.sh
-```
+## 3. Automatic installation
 
 The script requests `sudo` itself and installs Git, BlueZ, CA certificates, curl,
 Python, venv, pip and rfkill. It enables Bluetooth, creates the restricted
@@ -72,8 +109,17 @@ journalctl -u mc3000-control -n 100 --no-pager
 sudo systemctl restart mc3000-control
 ```
 
-Back up data from Settings before updates. Extract a new release and run its
-`./install.sh`; persistent data remains in `/var/lib/mc3000-control`.
+Back up data from Settings before updates. For a release installation, extract the new
+release and run its `./install.sh`. For a Git installation, update the clone and run the
+installer again:
+
+```bash
+cd ~/mc3000-control
+git pull --ff-only
+./install.sh
+```
+
+Persistent data remains in `/var/lib/mc3000-control` with either path.
 
 The service is designed for a trusted local network. Enable the built-in login and use
 HTTPS or a trusted VPN before traffic crosses an untrusted network. Never expose port

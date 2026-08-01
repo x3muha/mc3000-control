@@ -35,17 +35,41 @@ HTTPS or open it as `localhost`; normal use on a trusted LAN continues to work o
 
 ## Raspberry Pi installation
 
-Use a current Raspberry Pi OS Lite 64-bit image. Download the release archive, transfer
-and extract it, enter the extracted directory, then run:
+Use a current Raspberry Pi OS Lite 64-bit image. There are two supported installation
+paths.
+
+### Option A: install a stable release (recommended)
+
+Download the current archive from the
+[GitHub Releases page](https://github.com/x3muha/mc3000-control/releases/latest),
+transfer and extract it, enter the extracted directory, then run:
 
 ```bash
 ./install.sh
 ```
 
-No prior Git, Python, BlueZ or Python package setup is required. The installer requests
-administrator privileges, installs all dependencies, enables Bluetooth, creates a
-dedicated service account and isolated Python environment, starts the service and checks
-its health. Open `http://<RASPBERRY-PI-IP>:8083/` afterward.
+This path requires no prior Git, Python, BlueZ or Python package setup.
+
+### Option B: install the current Git revision
+
+To use the newest revision from the `main` branch, install Git only for downloading the
+repository and then run the same installer:
+
+```bash
+sudo apt update
+sudo apt install -y git
+git clone https://github.com/x3muha/mc3000-control.git
+cd mc3000-control
+./install.sh
+```
+
+The release is the recommended, fixed and versioned build. A Git clone may already
+contain changes that have not yet been published as a release.
+
+With either path, the installer requests administrator privileges, installs all other
+dependencies, enables Bluetooth, creates a dedicated service account and isolated
+Python environment, starts the service and checks its health. Open
+`http://<RASPBERRY-PI-IP>:8083/` afterward.
 
 See [INSTALL_RASPBERRY_PI.en.md](INSTALL_RASPBERRY_PI.en.md) for the complete process or
 [INSTALL_LINUX.en.md](INSTALL_LINUX.en.md) for other Linux hosts.

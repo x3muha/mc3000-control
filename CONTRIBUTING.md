@@ -11,6 +11,8 @@ Contributions, protocol observations and compatibility reports are welcome.
 5. Describe the tested MC3000 hardware/firmware and Linux/BlueZ version in the pull
    request. Never post Bluetooth addresses, serial numbers, passwords, databases or
    battery notes.
+6. Keep user-facing documentation and interface text in sync in German and English.
+   Update the matching `.md` files or translation keys together in the same change.
 
 Tests use temporary databases and simulated BLE clients. Hardware testing must be
 explicit, supervised and performed with suitable cells and safe charger settings.

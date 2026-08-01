@@ -36,15 +36,61 @@ Anschließend per SSH anmelden:
 ssh pi@mc3000-pi.local
 ```
 
-## 2. Release-Archiv bereitstellen
+## 2. Installationsquelle wählen
 
-Das aktuelle Release-Archiv `mc3000-control-<VERSION>.tar.gz` von der
-[Releases-Seite](https://github.com/x3muha/mc3000-control/releases) herunterladen,
-auf den Pi übertragen und entpacken. Dafür kann beispielsweise die Dateifreigabe des
-verwendeten SSH-Programms oder `scp` auf einem anderen Rechner verwendet werden.
+MC3000 Control kann als fest versioniertes Release oder direkt aus dem aktuellen
+Git-Stand installiert werden. Für einen normalen Einsatz wird das Release empfohlen.
 
-Es muss auf dem Pi vorher kein Paket installiert werden. Ein vollständiges Systemupdate
-ist empfehlenswert, aber keine Voraussetzung:
+### Variante A: stabiles Release installieren (empfohlen)
+
+1. Auf der
+   [GitHub-Releases-Seite](https://github.com/x3muha/mc3000-control/releases/latest)
+   unter `Assets` das Archiv `mc3000-control-<VERSION>.tar.gz` und optional die
+   zugehörige Datei `.sha256` herunterladen.
+2. Das Archiv auf den Raspberry Pi übertragen. Dafür kann die Dateifreigabe eines
+   grafischen SSH-Programms oder auf einem anderen Rechner `scp` verwendet werden:
+
+   ```bash
+   scp mc3000-control-<VERSION>.tar.gz <USER>@<HOSTNAME>.local:~/
+   ```
+
+3. Auf dem Raspberry Pi das Archiv entpacken, in den neuen Ordner wechseln und die
+   Installation starten:
+
+   ```bash
+   cd ~
+   tar -xzf mc3000-control-<VERSION>.tar.gz
+   cd mc3000-control-<VERSION>
+   ./install.sh
+   ```
+
+`<VERSION>`, `<USER>` und `<HOSTNAME>` sind durch die tatsächlich verwendeten Werte zu
+ersetzen. Für diesen Installationsweg muss vorher kein Paket auf dem Pi installiert
+werden.
+
+Falls auch die Prüfsummendatei übertragen wurde, kann das Archiv vor dem Entpacken
+geprüft werden:
+
+```bash
+sha256sum -c mc3000-control-<VERSION>.tar.gz.sha256
+```
+
+### Variante B: aktuellen Stand mit Git installieren
+
+Diese Variante lädt den neuesten Stand des Branches `main`. Er kann neuer als das letzte
+Release sein. Git wird nur zum Herunterladen benötigt; alle weiteren Voraussetzungen
+richtet `./install.sh` ein.
+
+```bash
+sudo apt update
+sudo apt install -y git
+git clone https://github.com/x3muha/mc3000-control.git
+cd mc3000-control
+./install.sh
+```
+
+Ein vollständiges Systemupdate ist bei beiden Varianten empfehlenswert, aber keine
+Voraussetzung:
 
 ```bash
 sudo apt full-upgrade -y
@@ -60,14 +106,7 @@ Die Installationsroutine installiert Git, BlueZ, Python, die virtuelle Python-Um
 `curl`, `rfkill`, CA-Zertifikate und alle Python-Abhängigkeiten. Sie aktiviert außerdem
 den Bluetooth-Dienst und hebt eine vorhandene Bluetooth-Sperre auf.
 
-## 3. Anwendung installieren
-
-In den entpackten Release-Ordner wechseln und die Installation starten:
-
-```bash
-cd mc3000-control-<VERSION>
-./install.sh
-```
+## 3. Automatische Installation
 
 `install.sh` fordert selbstständig über `sudo` Administratorrechte an. Das Skript:
 
@@ -427,9 +466,19 @@ Nach dem Schließen der Handy-App im Verbindungsmanager wieder `Verbinden` wähl
 
 ## 10. Updates
 
-Im lokalen Repository aktualisieren und erneut installieren:
+Vor einem Update in der Weboberfläche unter `Einstellungen` ein Backup erstellen.
+
+Bei einer Release-Installation das neue Release-Archiv herunterladen und wie in
+Variante A entpacken. Anschließend im neuen Ordner erneut ausführen:
 
 ```bash
+./install.sh
+```
+
+Eine Git-Installation wird im geklonten Repository aktualisiert und erneut installiert:
+
+```bash
+cd ~/mc3000-control
 git pull --ff-only
 ./install.sh
 ```
