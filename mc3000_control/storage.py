@@ -6,12 +6,13 @@ import json
 import math
 import sqlite3
 import threading
-from uuid import uuid4
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from .battery_manager import (
     AUTOMATIC_PROGRAMS,
@@ -2262,7 +2263,7 @@ def _build_run_report(
         if int(row["resistance_mohm"]) > 0
     ]
     energy_wh = 0.0
-    for previous, current in zip(measurements, measurements[1:], strict=False):
+    for previous, current in pairwise(measurements):
         time_delta = (
             datetime.fromisoformat(str(current["recorded_at"]))
             - datetime.fromisoformat(str(previous["recorded_at"]))

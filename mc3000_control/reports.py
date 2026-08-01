@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 import io
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import segno
 from reportlab.graphics.shapes import Drawing, Line, PolyLine, Rect, String
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import (
     Image,
-    KeepTogether,
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
@@ -270,7 +268,7 @@ def _chart(
     points: list[dict[str, Any]],
     series: tuple[tuple[str, str, colors.Color], ...],
     *,
-    target: float | int | None = None,
+    target: float | None = None,
     run_id: int | None = None,
     phase_opacity_percent: int = 15,
 ) -> Drawing:
@@ -356,8 +354,8 @@ def _chart(
         if target is not None and key == "capacity_mah" and y_min <= float(target) <= y_max:
             target_y = bottom + (float(target) - y_min) / (y_max - y_min) * plot_height
             drawing.add(Line(left, target_y, left + plot_width, target_y, strokeColor=colors.HexColor("#64748b"), strokeDashArray=[3, 3]))
-    start_label = datetime.fromtimestamp(x_min).strftime("%H:%M")
-    end_label = datetime.fromtimestamp(x_max).strftime("%H:%M")
+    start_label = datetime.fromtimestamp(x_min, UTC).astimezone().strftime("%H:%M")
+    end_label = datetime.fromtimestamp(x_max, UTC).astimezone().strftime("%H:%M")
     drawing.add(String(left, bottom - 4 * mm, start_label, fontSize=7))
     drawing.add(String(left + plot_width, bottom - 4 * mm, end_label, fontSize=7, textAnchor="end"))
     return drawing

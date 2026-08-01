@@ -887,7 +887,7 @@ async def test_automatic_profile_api_edits_and_duplicates_settings(tmp_path) -> 
             )
             payload = {
                 key: gentle[key]
-                for key in {
+                for key in (
                     "label",
                     "description",
                     "mode_code",
@@ -900,7 +900,7 @@ async def test_automatic_profile_api_edits_and_duplicates_settings(tmp_path) -> 
                     "temp_limit_c",
                     "time_limit_mode",
                     "time_limit_min",
-                }
+                )
             }
             payload.update(
                 label="Noch schonender laden",

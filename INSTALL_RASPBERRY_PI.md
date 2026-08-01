@@ -36,18 +36,15 @@ Anschließend per SSH anmelden:
 ssh pi@mc3000-pi.local
 ```
 
-## 2. Grundsystem vorbereiten
+## 2. Release-Archiv bereitstellen
 
-Nach dem ersten Start werden nur Git und aktuelle Paketlisten benötigt. Alle weiteren
-Abhängigkeiten richtet `install.sh` automatisch ein:
+Das aktuelle Release-Archiv `mc3000-control-<VERSION>.tar.gz` von der
+[Releases-Seite](https://github.com/x3muha/mc3000-control/releases) herunterladen,
+auf den Pi übertragen und entpacken. Dafür kann beispielsweise die Dateifreigabe des
+verwendeten SSH-Programms oder `scp` auf einem anderen Rechner verwendet werden.
 
-```bash
-sudo apt update
-sudo apt install -y git
-```
-
-Ein vollständiges Systemupdate ist empfehlenswert, aber keine Voraussetzung für die
-Installation:
+Es muss auf dem Pi vorher kein Paket installiert werden. Ein vollständiges Systemupdate
+ist empfehlenswert, aber keine Voraussetzung:
 
 ```bash
 sudo apt full-upgrade -y
@@ -59,17 +56,16 @@ Falls dabei Kernel- oder Firmwarepakete aktualisiert wurden, anschließend neu s
 sudo reboot
 ```
 
-Die spätere Installationsroutine installiert BlueZ, Python, die virtuelle Python-Umgebung,
-`curl`, `rfkill` und alle Python-Abhängigkeiten. Sie aktiviert außerdem den
-Bluetooth-Dienst und hebt eine vorhandene Bluetooth-Sperre auf.
+Die Installationsroutine installiert Git, BlueZ, Python, die virtuelle Python-Umgebung,
+`curl`, `rfkill`, CA-Zertifikate und alle Python-Abhängigkeiten. Sie aktiviert außerdem
+den Bluetooth-Dienst und hebt eine vorhandene Bluetooth-Sperre auf.
 
 ## 3. Anwendung installieren
 
-Den öffentlichen Quellcode abrufen und die Installation starten:
+In den entpackten Release-Ordner wechseln und die Installation starten:
 
 ```bash
-git clone https://github.com/x3muha/mc3000-control.git
-cd mc3000-control
+cd mc3000-control-<VERSION>
 ./install.sh
 ```
 

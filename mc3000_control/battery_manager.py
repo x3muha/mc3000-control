@@ -14,8 +14,8 @@ from .profiles import (
     DEFAULT_MANUAL_TIME_LIMIT_MIN,
     DISCHARGE_CURRENT_MAX_MA,
     DISCHARGE_CURRENT_MIN_MA,
-    ProfileValues,
     TIME_LIMIT_MODES,
+    ProfileValues,
     effective_time_limit_min,
 )
 from .protocol import BATTERY_TYPES

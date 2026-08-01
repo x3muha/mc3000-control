@@ -31,6 +31,7 @@ if command -v apt-get >/dev/null 2>&1; then
     bluez \
     ca-certificates \
     curl \
+    git \
     python3 \
     python3-pip \
     python3-venv \
@@ -79,11 +80,25 @@ install -o root -g root -m 0644 "${SOURCE_DIR}/README.md" "${RELEASE_DIR}/"
 install -o root -g root -m 0644 "${SOURCE_DIR}/INSTALL_RASPBERRY_PI.md" "${RELEASE_DIR}/"
 install -o root -g root -m 0644 "${SOURCE_DIR}/INSTALL_LINUX.md" "${RELEASE_DIR}/"
 install -o root -g root -m 0644 "${SOURCE_DIR}/LICENSE" "${RELEASE_DIR}/"
+for optional_document in \
+  README.en.md \
+  INSTALL_RASPBERRY_PI.en.md \
+  INSTALL_LINUX.en.md \
+  CHANGELOG.md \
+  CONTRIBUTING.md \
+  SECURITY.md; do
+  if [[ -f "${SOURCE_DIR}/${optional_document}" ]]; then
+    install -o root -g root -m 0644 \
+      "${SOURCE_DIR}/${optional_document}" \
+      "${RELEASE_DIR}/"
+  fi
+done
 cp -a "${SOURCE_DIR}/mc3000_control" "${RELEASE_DIR}/"
 cp -a "${SOURCE_DIR}/deploy" "${RELEASE_DIR}/"
 cp -a "${SOURCE_DIR}/docs" "${RELEASE_DIR}/"
 
 python3 -m venv "${RELEASE_DIR}/.venv"
+"${RELEASE_DIR}/.venv/bin/pip" install --no-cache-dir --upgrade pip
 "${RELEASE_DIR}/.venv/bin/pip" install --no-cache-dir "${RELEASE_DIR}"
 "${RELEASE_DIR}/.venv/bin/python" -c \
   'import bleak, fastapi, mc3000_control, reportlab, segno, uvicorn'

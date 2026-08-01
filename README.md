@@ -1,5 +1,7 @@
 # MC3000 Control
 
+[English documentation](README.en.md) · Demo nach Installation: `/?demo=1`
+
 MC3000 Control ist eine lokale, responsive Weboberfläche für ein oder mehrere
 SkyRC-MC3000-Ladegeräte. Ein Linux-Rechner mit Bluetooth LE hält die
 Geräteverbindungen, zeichnet Messwerte auf und stellt Steuerung, Profile,
@@ -8,6 +10,13 @@ kein eigenes Bluetooth.
 
 Das Projekt ist eine unabhängige Software und steht in keiner Verbindung zum
 Hersteller SkyRC.
+
+![Kurzdemo von Liveansicht, Profilen und Aufzeichnungen](docs/media/mc3000-control-demo.gif)
+
+Weitere Ansichten: [Dashboard im Darkmode](docs/images/dashboard-dark.png) ·
+[Profilbibliothek](docs/images/profiles.png) ·
+[Aufzeichnungen](docs/images/recordings.png) ·
+[WebM-Kurzdemo](docs/media/mc3000-control-demo.webm)
 
 ## Feature-Übersicht
 
@@ -38,6 +47,7 @@ Hersteller SkyRC.
 - Begrenzung berechneter Ströme auf 3 A Laden und 2 A Entladen
 - Zeitlimit wahlweise automatisch berechnet, manuell festgelegt oder deaktiviert
 - Schutz vor parallelen Konfigurationsaufträgen und doppelten Batterieakten
+- Portabler JSON-Import und -Export kompletter Profilbibliotheken
 
 ### Liveansicht und Diagramme
 
@@ -89,6 +99,11 @@ Hersteller SkyRC.
 - Passwortspeicherung mit scrypt und individuellem Salt
 - Responsive Oberfläche für Desktop, Tablet und Smartphone
 - Anklickbare Versionsanzeige mit den Änderungen der installierten Version
+- Deutsche und englische Oberfläche
+- Schreibgeschützter Demo-Modus mit realistischen Beispieldaten
+- Anonymisiertes Diagnosepaket ohne Datenbank, Adressen oder private Metadaten
+- Installierbare Progressive Web App; Steuerungs- und API-Antworten werden nie
+  offline zwischengespeichert
 
 ## Voraussetzungen
 
@@ -107,22 +122,46 @@ MC3000 Control das Gerät verwendet.
 Eine vollständige Anleitung für ein frisches Raspberry Pi OS Lite 64 Bit steht in
 [INSTALL_RASPBERRY_PI.md](INSTALL_RASPBERRY_PI.md).
 
-Nach der Grundinstallation von Git:
+Das Release-Archiv auf den Raspberry Pi übertragen, entpacken und im entpackten Ordner
+nur das Installationsskript starten:
 
 ```bash
-git clone https://github.com/x3muha/mc3000-control.git
-cd mc3000-control
 ./install.sh
 ```
 
-Das Installationsskript fordert selbstständig Administratorrechte an, installiert
-BlueZ und Python-Abhängigkeiten, aktiviert Bluetooth, richtet einen eigenen
-Systembenutzer sowie eine isolierte Python-Umgebung ein und prüft den gestarteten
-Dienst. Die Oberfläche ist anschließend unter
+Es müssen vorher weder Git noch Python, BlueZ oder Python-Pakete eingerichtet werden.
+Das Skript fordert selbstständig Administratorrechte an, installiert alle benötigten
+System- und Python-Abhängigkeiten, aktiviert Bluetooth, richtet einen eigenen
+Systembenutzer sowie eine isolierte Python-Umgebung ein und prüft den gestarteten Dienst.
+Die Oberfläche ist anschließend unter
 `http://<IP-DES-RASPBERRY-PI>:8083/` erreichbar.
 
 Für Debian, Ubuntu, Fedora, Arch Linux und andere Rechner mit Bluetooth LE siehe
 [INSTALL_LINUX.md](INSTALL_LINUX.md).
+
+## Demo
+
+Mit `http://<HOST>:8083/?demo=1` wird eine schreibgeschützte Beispielsitzung im Browser
+geöffnet. Sie enthält Lade-, Pausen- und Entladephasen, Batterieakten, Profile und einen
+abgeschlossenen Kapazitätstest. Der Demo-Modus öffnet keine WebSocket- oder
+Bluetooth-Verbindung und sendet keine Schreibbefehle an die API.
+
+Für die Installation als PWA verlangen aktuelle Browser einen sicheren Kontext. Dafür
+muss MC3000 Control über HTTPS bereitgestellt oder direkt als `localhost` geöffnet
+werden; die normale Bedienung im lokalen Netz funktioniert weiterhin über HTTP.
+
+## Kompatibilität
+
+| Komponente | Status |
+| --- | --- |
+| MC3000 Hardware 2.2 / Firmware 1.25 | praktisch verifiziert |
+| Andere MC3000-Versionen mit bekanntem BLE-GATT-Protokoll | vorgesehen; Rückmeldungen willkommen |
+| Raspberry Pi OS Lite 64 Bit (Bookworm/Trixie) | automatische Installation unterstützt |
+| Python 3.11, 3.12 und 3.13 | automatisiert getestet |
+| BlueZ ab 5.55 | unterstützt |
+| Direkte USB-Verbindung / Bluetooth SPP | nicht unterstützt |
+
+Weitere Einzelheiten: [Kompatibilitätsmatrix](docs/COMPATIBILITY.md).
 
 ## Entwicklungsstart
 
@@ -171,8 +210,15 @@ node --check mc3000_control/static/app.js
 
 - [Installation und Betrieb](INSTALL_RASPBERRY_PI.md)
 - [Installation auf anderen Linux-Systemen](INSTALL_LINUX.md)
+- [English installation on Raspberry Pi](INSTALL_RASPBERRY_PI.en.md)
+- [English installation on other Linux systems](INSTALL_LINUX.en.md)
+- [Kompatibilitätsmatrix](docs/COMPATIBILITY.md)
 - [BLE-Protokollnotizen](docs/BLE_PROTOCOL.md)
 - [Automatische Tests](tests/README.md)
+- [Änderungsprotokoll](CHANGELOG.md)
+- [Beiträge](CONTRIBUTING.md)
+- [Sicherheitsrichtlinie](SECURITY.md)
+- [Sicherheitsprüfung für Version 1.0](docs/SECURITY_REVIEW.md)
 
 ## Lizenz
 

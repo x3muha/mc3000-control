@@ -25,6 +25,8 @@ Bluetooth-Verbindungen. Sie starten kein reales Lade- oder Entladeprogramm.
   Einstellungen, Kategorien und Login.
 - `test_app_features.py` prüft die integrierten Funktionen wie QR-Code, PDF-Bericht,
   Meldungen, Backup und endgültige Batterielöschung.
+- `test_v1_features.py` prüft Profil-Austausch, Importgrenzen, anonymisierte Diagnosen,
+  Sicherheitsheader, Login-Drosselung, Demo-Modus und PWA-Ressourcen.
 
 ## Tests ausführen
 
@@ -58,6 +60,11 @@ Zusätzlich sollte die JavaScript-Syntax geprüft werden:
 
 ```bash
 node --check mc3000_control/static/app.js
+node --check mc3000_control/static/demo.js
+node --check mc3000_control/static/i18n.js
+node --check mc3000_control/static/sw.js
+node --check mc3000_control/static/theme-init.js
+node --check mc3000_control/static/login.js
 ```
 
 Ein fehlgeschlagener Test bedeutet nicht automatisch, dass Hardware beschädigt wurde.

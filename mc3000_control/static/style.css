@@ -113,6 +113,19 @@ body {
   min-height: 100vh;
 }
 
+.demo-banner {
+  display: none;
+  padding: 0.5rem 1rem;
+  background: #715713;
+  color: #fff6d8;
+  font-weight: 700;
+  text-align: center;
+}
+
+.demo-mode .demo-banner {
+  display: block;
+}
+
 button,
 input,
 select,

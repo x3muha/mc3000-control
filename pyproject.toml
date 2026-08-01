@@ -4,11 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mc3000-control"
-version = "0.18.4"
-description = "Lokale Mehrgeraete-Weboberflaeche fuer SkyRC MC3000 Ladegeraete"
+version = "1.0.0"
+description = "Local multi-charger web interface for SkyRC MC3000 chargers"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
   "bleak>=3.0,<4",
   "fastapi>=0.115,<1",
@@ -23,8 +24,14 @@ Repository = "https://github.com/x3muha/mc3000-control"
 [project.optional-dependencies]
 test = [
   "httpx>=0.28,<1",
-  "pytest>=8.3,<9",
-  "pytest-asyncio>=0.25,<1",
+  "pytest>=9.0.3,<10",
+  "pytest-asyncio>=1.4,<2",
+]
+audit = [
+  "bandit>=1.9,<2",
+  "build>=1.5,<2",
+  "pip-audit>=2.10,<3",
+  "ruff>=0.16,<1",
 ]
 
 [project.scripts]

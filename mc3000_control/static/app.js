@@ -1,5 +1,7 @@
 "use strict";
 
+const demoMode = new URLSearchParams(location.search).get("demo") === "1";
+
 const appState = {
   devices: [],
   discovered: [],
@@ -224,6 +226,7 @@ const elements = {
   standardProgramPreview: document.getElementById("standardProgramPreview"),
   settingsForm: document.getElementById("settingsForm"),
   settingsTheme: document.getElementById("settingsTheme"),
+  settingsLanguage: document.getElementById("settingsLanguage"),
   settingsDefaultProgram: document.getElementById("settingsDefaultProgram"),
   settingsPhaseOpacity: document.getElementById("settingsPhaseOpacity"),
   settingsPhaseOpacityValue: document.getElementById("settingsPhaseOpacityValue"),
@@ -233,6 +236,8 @@ const elements = {
   settingsLoginPassword: document.getElementById("settingsLoginPassword"),
   settingsLogoutButton: document.getElementById("settingsLogoutButton"),
   restoreBackupFile: document.getElementById("restoreBackupFile"),
+  importProfilesFile: document.getElementById("importProfilesFile"),
+  installPwaButton: document.getElementById("installPwaButton"),
   runReportDialog: document.getElementById("runReportDialog"),
   runReportTitle: document.getElementById("runReportTitle"),
   runReportContent: document.getElementById("runReportContent"),
@@ -244,6 +249,8 @@ const elements = {
   runCapacityLegend: document.getElementById("runCapacityLegend"),
   runCapacityChart: document.getElementById("runCapacityChart"),
 };
+
+let installPrompt = null;
 
 [elements.curveDialog, elements.runChartDialog].forEach(
   (dialog) => enableBackdropClose(dialog),
@@ -269,6 +276,16 @@ function enableBackdropClose(dialog) {
 
 function connectWebsocket() {
   clearTimeout(reconnectTimer);
+  if (demoMode && window.MC3000_DEMO) {
+    document.body.classList.add("demo-mode");
+    elements.connectionSummary.textContent = "Demo mode · read-only";
+    applyPayload(window.MC3000_DEMO.payload());
+    reconnectTimer = setInterval(
+      () => applyPayload(window.MC3000_DEMO.payload()),
+      2000,
+    );
+    return;
+  }
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   websocket = new WebSocket(`${protocol}//${location.host}/ws`);
 
@@ -584,6 +601,9 @@ function updateSummary() {
 }
 
 async function api(path, options = {}) {
+  if (demoMode && window.MC3000_DEMO) {
+    return window.MC3000_DEMO.api(path, options);
+  }
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
@@ -844,7 +864,20 @@ document.addEventListener("click", async (event) => {
     } else if (action === "enable-browser-notifications") {
       await enableBrowserNotifications();
     } else if (action === "download-backup") {
+      if (demoMode) throw new Error("Demo mode is read-only");
       window.location.assign("/api/admin/backup");
+    } else if (action === "export-profiles") {
+      if (demoMode) throw new Error("Demo mode is read-only");
+      window.location.assign("/api/profiles/export");
+    } else if (action === "download-diagnostics") {
+      if (demoMode) throw new Error("Demo mode is read-only");
+      window.location.assign("/api/admin/diagnostics");
+    } else if (action === "install-pwa") {
+      if (!installPrompt) throw new Error("Installation is not available in this browser");
+      await installPrompt.prompt();
+      await installPrompt.userChoice;
+      installPrompt = null;
+      elements.installPwaButton.hidden = true;
     } else if (action === "logout") {
       await api("/api/auth/logout", { method: "POST" });
       location.assign("/login");
@@ -974,6 +1007,27 @@ elements.restoreBackupFile.addEventListener("change", async () => {
     showToast(error.message, true);
   } finally {
     elements.restoreBackupFile.value = "";
+  }
+});
+
+elements.importProfilesFile.addEventListener("change", async () => {
+  const file = elements.importProfilesFile.files?.[0];
+  if (!file) return;
+  try {
+    if (demoMode) throw new Error("Demo mode is read-only");
+    if (file.size > 1_000_000) throw new Error("Die Importdatei ist zu groß");
+    const result = await api("/api/profiles/import", {
+      method: "POST",
+      body: await file.text(),
+    });
+    await Promise.all([loadProfiles(), loadBatteryOptions()]);
+    showToast(
+      `${result.imported.profiles} Profile und ${result.imported.automatic_profiles} Automatikprofile importiert`,
+    );
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    elements.importProfilesFile.value = "";
   }
 });
 
@@ -5373,13 +5427,13 @@ function signalText(rssi) {
 function formatNumber(value, digits) {
   const number = Number(value);
   return Number.isFinite(number)
-    ? number.toLocaleString("de-DE", { minimumFractionDigits: digits, maximumFractionDigits: digits })
+    ? number.toLocaleString(window.MC3000_I18N?.language === "en" ? "en-US" : "de-DE", { minimumFractionDigits: digits, maximumFractionDigits: digits })
     : "--";
 }
 
 function formatInteger(value) {
   const number = Number(value);
-  return Number.isFinite(number) ? Math.round(number).toLocaleString("de-DE") : "--";
+  return Number.isFinite(number) ? Math.round(number).toLocaleString(window.MC3000_I18N?.language === "en" ? "en-US" : "de-DE") : "--";
 }
 
 function formatDuration(seconds) {
@@ -5502,3 +5556,13 @@ connectWebsocket();
 loadReferenceData();
 loadNotifications();
 setInterval(() => loadNotifications({ announce: true }), 20000);
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  elements.installPwaButton.hidden = false;
+});
+
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
+}

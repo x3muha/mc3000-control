@@ -2,7 +2,12 @@ import sqlite3
 
 import pytest
 
-from mc3000_control.backup import BackupError, create_backup, inspect_backup, restore_backup
+from mc3000_control.backup import (
+    BackupError,
+    create_backup,
+    inspect_backup,
+    restore_backup,
+)
 from mc3000_control.registry import DeviceRegistry
 from mc3000_control.storage import BatteryStore, MeasurementStore, ProfileStore
 

@@ -105,7 +105,7 @@ def test_profile_store_seeds_and_updates_profiles(tmp_path) -> None:
 
 def test_existing_profiles_get_time_limit_mode_and_six_hour_defaults(tmp_path) -> None:
     path = tmp_path / "mc3000.db"
-    store = ProfileStore(path)
+    ProfileStore(path)
     with sqlite3.connect(path) as connection:
         connection.execute("ALTER TABLE profiles DROP COLUMN time_limit_mode")
         connection.execute("ALTER TABLE profiles DROP COLUMN is_builtin")

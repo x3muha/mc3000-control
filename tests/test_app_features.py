@@ -31,8 +31,8 @@ async def test_health_and_interface_expose_version_fixes(tmp_path) -> None:
     assert 'id="appFixes"' in interface.text
     assert 'id="settingsPhaseOpacity"' in interface.text
     assert 'id="settingsTheme"' in interface.text
-    assert 'document.documentElement.dataset.theme' in interface.text
-    assert 'document.documentElement.dataset.theme' in login.text
+    assert '/static/theme-init.js?v=100' in interface.text
+    assert '/static/theme-init.js?v=100' in login.text
     assert "workshopView" not in interface.text
     assert "loadWorkshop" not in script.text
     assert removed_workshop.status_code == 404

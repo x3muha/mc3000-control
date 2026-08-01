@@ -65,8 +65,8 @@ sudo apt install -y \
   rfkill
 ```
 
-Die automatische Installationsroutine kann diese Pakete ebenfalls selbst nachinstallieren.
-Vor dem Abrufen des Repositorys muss lediglich Git vorhanden sein.
+Die automatische Installationsroutine installiert diese Pakete auf Systemen mit APT
+selbst. Bei der Installation aus einem Release-Archiv ist keine Vorbereitung nötig.
 
 ### Fedora
 
@@ -165,11 +165,10 @@ Das MC3000 nicht mit `bluetoothctl pair`, `trust` oder `connect` koppeln. MC3000
 
 ## 6. MC3000 Control installieren
 
-```bash
-git clone https://github.com/x3muha/mc3000-control.git
-cd mc3000-control
-./install.sh
-```
+Das aktuelle Release-Archiv entpacken, in den Ordner wechseln und `./install.sh`
+ausführen. Auf Debian-, Ubuntu- und Mint-Systemen installiert das Skript alle benötigten
+Systempakete selbst. Auf anderen Distributionen müssen die in Abschnitt 3 genannten
+Pakete vorhanden sein.
 
 Das Skript fordert über `sudo` Administratorrechte an und führt anschließend aus:
 

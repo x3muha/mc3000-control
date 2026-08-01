@@ -1,11 +1,11 @@
 """MC3000 Control."""
 
-__version__ = "0.18.4"
+__version__ = "1.0.0"
 
 __release_notes__ = (
-    "Helles, dunkles oder automatisch übernommenes Systemfarbschema für die vollständige Oberfläche und alle Diagramme.",
-    "Farbige Programmphasen in Live- und Verlaufsdiagrammen: Laden, Pause und Entladen bei neutralem Leerlauf.",
-    "Anzeige der per Bluetooth gemeldeten Lüfterregelung in der Geräteübersicht.",
-    "Abgesicherte Profilübertragung mit Schutz vor parallelen Aufträgen und doppelten Batterieakten.",
-    "Endgültige Löschung archivierter Batterieakten samt Messwerten, Läufen und Berichten nach Nummernbestätigung.",
+    "Stabile Mehrgeräte-Steuerung über Bluetooth LE mit Profilen, Batterieakten, Aufzeichnungen, Diagrammen und Berichten.",
+    "Deutsche und englische Oberfläche mit Hell-/Darkmode, schreibgeschützter Demo und installierbarer Web-App.",
+    "Portabler Profil-Import und -Export sowie anonymisierte Diagnosen ohne Datenbank oder Gerätekennungen.",
+    "Vereinfachte Raspberry-Pi-Installation aus dem Release-Archiv mit automatischer Einrichtung aller Abhängigkeiten.",
+    "Erweiterte Sicherheitsprüfungen, Browser-Schutz, Login-Drosselung und automatisierte Tests für Python 3.11 bis 3.13.",
 )

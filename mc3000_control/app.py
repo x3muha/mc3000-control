@@ -4,14 +4,17 @@ import asyncio
 import hashlib
 import hmac
 import io
+import json
 import logging
 import os
 import secrets
 import signal
+import time
 from contextlib import asynccontextmanager, suppress
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import segno
 import uvicorn
@@ -45,6 +48,14 @@ from .battery_manager import (
     build_standard_profile,
 )
 from .ble import DeviceManager, DeviceSession
+from .diagnostics import create_diagnostics, install_log_collector
+from .pack_builder import PackBuilderError, build_cell_groups
+from .profile_exchange import (
+    MAX_IMPORT_BYTES,
+    ProfileExchangeError,
+    export_profiles,
+    import_profiles,
+)
 from .profiles import (
     DEFAULT_MANUAL_TIME_LIMIT_MIN,
     ProfileError,
@@ -52,13 +63,13 @@ from .profiles import (
     build_profile_packet,
     profile_options_payload,
 )
-from .pack_builder import PackBuilderError, build_cell_groups
 from .registry import DeviceRegistry
 from .reports import battery_sheet_pdf, run_report_pdf
 from .storage import BatteryStore, MeasurementStore, ProfileStore
 
 LOGGER = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).with_name("static")
+install_log_collector()
 
 
 class EnrollRequest(BaseModel):
@@ -353,6 +364,30 @@ def create_app(
         docs_url=None,
         redoc_url=None,
     )
+    failed_logins: dict[str, list[float]] = {}
+
+    async def security_headers(request: Request, call_next):
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            origin = request.headers.get("origin")
+            if origin and not _origin_matches_host(origin, request.headers.get("host", "")):
+                return JSONResponse(
+                    {"detail": "Anfrage von einer fremden Herkunft wurde abgelehnt"},
+                    status_code=403,
+                )
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        )
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; connect-src 'self' ws: wss:; "
+            "img-src 'self' data:; script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; object-src 'none'; "
+            "base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        )
+        return response
 
     @app.middleware("http")
     async def login_guard(request: Request, call_next):
@@ -361,6 +396,8 @@ def create_app(
             "/api/auth/status",
             "/api/auth/login",
             "/api/health",
+            "/manifest.webmanifest",
+            "/sw.js",
         }
         if request.url.path in public_paths or request.url.path.startswith("/static/"):
             return await call_next(request)
@@ -388,6 +425,8 @@ def create_app(
             )
         return RedirectResponse("/login", status_code=303)
 
+    app.middleware("http")(security_headers)
+
     @app.get("/login", response_class=HTMLResponse)
     async def login_page() -> str:
         return _login_page()
@@ -399,15 +438,16 @@ def create_app(
             "auth_enabled",
             "0",
         )
-        username = await asyncio.to_thread(
-            app.state.profiles.get_app_setting,
-            "auth_username",
-            "",
-        )
-        return {"enabled": enabled == "1", "username": username}
+        return {"enabled": enabled == "1"}
 
     @app.post("/api/auth/login")
     async def login(request: Request, credentials: LoginRequest) -> Response:
+        client_key = request.client.host if request.client else "unknown"
+        now = time.monotonic()
+        recent_failures = [
+            value for value in failed_logins.get(client_key, []) if now - value < 300
+        ]
+        failed_logins[client_key] = recent_failures
         enabled, username, password_record, secret = await asyncio.gather(
             asyncio.to_thread(
                 app.state.profiles.get_app_setting,
@@ -431,15 +471,23 @@ def create_app(
             ),
         )
         if enabled != "1":
+            failed_logins.pop(client_key, None)
             return JSONResponse({"ok": True, "enabled": False})
-        if (
-            not hmac.compare_digest(credentials.username, username)
-            or not _verify_password(credentials.password, password_record)
-        ):
+        if len(recent_failures) >= 5:
+            return JSONResponse(
+                {"detail": "Zu viele Anmeldeversuche. Bitte später erneut versuchen."},
+                status_code=429,
+                headers={"Retry-After": "300"},
+            )
+        username_valid = hmac.compare_digest(credentials.username, username)
+        password_valid = _verify_password(credentials.password, password_record)
+        if not (username_valid and password_valid):
+            recent_failures.append(now)
             raise HTTPException(
                 status_code=401,
                 detail="Benutzername oder Passwort ist falsch",
             )
+        failed_logins.pop(client_key, None)
         if not secret:
             secret = secrets.token_hex(32)
             await asyncio.to_thread(
@@ -767,6 +815,52 @@ def create_app(
     async def profiles() -> dict:
         stored = await asyncio.to_thread(app.state.profiles.list)
         return {"profiles": [profile.to_dict() for profile in stored]}
+
+    @app.get("/api/profiles/export")
+    async def download_profiles() -> Response:
+        payload = await asyncio.to_thread(
+            export_profiles,
+            app.state.profiles,
+            application_version=__version__,
+        )
+        timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        return Response(
+            content=json.dumps(payload, ensure_ascii=False, indent=2),
+            media_type="application/json",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="mc3000-profiles-{timestamp}.json"'
+                ),
+                "Cache-Control": "no-store",
+            },
+        )
+
+    @app.post("/api/profiles/import")
+    async def upload_profiles(request: Request) -> dict:
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                declared_size = int(content_length)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Ungültige Content-Length",
+                ) from exc
+            if declared_size > MAX_IMPORT_BYTES:
+                raise HTTPException(status_code=413, detail="Die Importdatei ist zu groß")
+        content = await request.body()
+        if len(content) > MAX_IMPORT_BYTES:
+            raise HTTPException(status_code=413, detail="Die Importdatei ist zu groß")
+        try:
+            payload = json.loads(content)
+            result = await asyncio.to_thread(
+                import_profiles,
+                app.state.profiles,
+                payload,
+            )
+        except (json.JSONDecodeError, UnicodeDecodeError, ProfileExchangeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True, "imported": result}
 
     @app.get("/api/profile-categories")
     async def profile_categories() -> dict:
@@ -2122,13 +2216,40 @@ def create_app(
             )
         except BackupError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         return Response(
             content=content,
             media_type="application/zip",
             headers={
                 "Content-Disposition": (
                     f'attachment; filename="mc3000-control-{timestamp}.zip"'
+                ),
+                "Cache-Control": "no-store",
+            },
+        )
+
+    @app.get("/api/admin/diagnostics")
+    async def download_diagnostics() -> Response:
+        profiles, batteries, runs = await asyncio.gather(
+            asyncio.to_thread(app.state.profiles.list),
+            asyncio.to_thread(app.state.batteries.list, include_archived=True),
+            asyncio.to_thread(app.state.measurements.list_runs, limit=500),
+        )
+        content = await asyncio.to_thread(
+            create_diagnostics,
+            version=__version__,
+            manager_payload=app.state.manager.payload(),
+            profile_count=len(profiles),
+            battery_count=len(batteries),
+            run_count=len(runs),
+        )
+        timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        return Response(
+            content=content,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="mc3000-diagnostics-{timestamp}.zip"'
                 ),
                 "Cache-Control": "no-store",
             },
@@ -2193,6 +2314,11 @@ def create_app(
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket) -> None:
+        origin = websocket.headers.get("origin")
+        host = websocket.headers.get("host", "")
+        if origin and not _origin_matches_host(origin, host):
+            await websocket.close(code=4403)
+            return
         auth_enabled, auth_secret = await asyncio.gather(
             asyncio.to_thread(
                 app.state.profiles.get_app_setting,
@@ -2241,6 +2367,21 @@ def create_app(
     async def index() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
 
+    @app.get("/manifest.webmanifest")
+    async def web_manifest() -> FileResponse:
+        return FileResponse(
+            STATIC_DIR / "manifest.webmanifest",
+            media_type="application/manifest+json",
+        )
+
+    @app.get("/sw.js")
+    async def service_worker() -> FileResponse:
+        return FileResponse(
+            STATIC_DIR / "sw.js",
+            media_type="application/javascript",
+            headers={"Cache-Control": "no-cache"},
+        )
+
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
 
@@ -2256,6 +2397,15 @@ def _phase_opacity_percent(value: object) -> int:
 def _theme_preference(value: object) -> str:
     theme = str(value)
     return theme if theme in {"system", "light", "dark"} else "system"
+
+
+def _origin_matches_host(origin: str, host: str) -> bool:
+    try:
+        origin_host = urlsplit(origin).netloc.casefold()
+    except ValueError:
+        return False
+    expected = host.casefold()
+    return bool(origin_host and expected and hmac.compare_digest(origin_host, expected))
 
 
 def _hash_password(password: str) -> str:
@@ -2312,20 +2462,7 @@ def _login_page() -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Anmelden · MC3000 Control</title>
-  <script>
-    (() => {
-      let preference = "system";
-      try {
-        preference = localStorage.getItem("mc3000-theme") || "system";
-      } catch (_error) {
-        // The system preference remains available without local storage.
-      }
-      const dark = preference === "dark" || (
-        preference === "system" && matchMedia("(prefers-color-scheme: dark)").matches
-      );
-      document.documentElement.dataset.theme = dark ? "dark" : "light";
-    })();
-  </script>
+  <script src="/static/theme-init.js?v=100"></script>
   <style>
     :root { color-scheme:light; font-family:Inter, system-ui, sans-serif; --page:#f2f4f5; --surface:#fff; --ink:#202427; --muted:#667078; --line:#cfd6d9; --input:#fff; --button:#16825d; --button-ink:#fff; --error:#b52b34; }
     :root[data-theme="dark"] { color-scheme:dark; --page:#10171a; --surface:#182125; --ink:#e8eef0; --muted:#a8b4ba; --line:#344249; --input:#11191d; --button:#4fc59a; --button-ink:#07110d; --error:#ff8991; }
@@ -2350,26 +2487,8 @@ def _login_page() -> str:
       <p id="error" role="alert"></p>
     </form>
   </main>
-  <script>
-    document.getElementById("login").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const error = document.getElementById("error");
-      error.textContent = "";
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-          username: document.getElementById("username").value,
-          password: document.getElementById("password").value
-        })
-      });
-      if (response.ok) location.assign("/");
-      else {
-        const data = await response.json().catch(() => ({}));
-        error.textContent = data.detail || "Anmeldung fehlgeschlagen";
-      }
-    });
-  </script>
+  <script src="/static/i18n.js?v=100"></script>
+  <script src="/static/login.js?v=100"></script>
 </body>
 </html>"""
 
@@ -2492,9 +2611,10 @@ def main() -> None:
         level=os.environ.get("MC3000_LOG_LEVEL", "INFO"),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    # Listening on the LAN is the intended deployment model.
     uvicorn.run(
         "mc3000_control.app:app",
-        host=os.environ.get("MC3000_HOST", "0.0.0.0"),
+        host=os.environ.get("MC3000_HOST", "0.0.0.0"),  # nosec
         port=int(os.environ.get("MC3000_PORT", "8083")),
         log_level=os.environ.get("MC3000_LOG_LEVEL", "info").lower(),
     )
