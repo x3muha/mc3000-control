@@ -1,0 +1,966 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>MC3000 Control</title>
+  <script>
+    (() => {
+      let preference = "system";
+      try {
+        preference = localStorage.getItem("mc3000-theme") || "system";
+      } catch (_error) {
+        // The system preference remains available without local storage.
+      }
+      const dark = preference === "dark" || (
+        preference === "system" && matchMedia("(prefers-color-scheme: dark)").matches
+      );
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+    })();
+  </script>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css?v=21">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <p class="eyebrow">LADEGERÄTE</p>
+        <h1>MC3000 Control</h1>
+      </div>
+      <nav class="main-tabs" aria-label="Bereiche">
+        <button class="tab-button active" data-action="show-view" data-view="devicesView">Ladegeräte</button>
+        <button class="tab-button" data-action="show-view" data-view="profilesView">Profile</button>
+        <button class="tab-button" data-action="show-view" data-view="batteryManagerView">Batterien</button>
+        <button class="tab-button" data-action="show-view" data-view="recordingsView"><span class="desktop-label">Aufzeichnungen</span><span class="mobile-label">Verlauf</span></button>
+        <button class="tab-button" data-action="show-view" data-view="settingsView"><span class="desktop-label">Einstellungen</span><span class="mobile-label">Setup</span></button>
+      </nav>
+      <div class="topbar-status">
+        <span id="connectionSummary" class="summary">Verbinde...</span>
+        <button id="notificationButton" class="icon-button notification-button" data-action="notifications" title="Meldungen" aria-label="Meldungen">●<span id="notificationCount" hidden></span></button>
+        <button class="icon-button" data-action="open-connection-manager" title="Ladegeräte verbinden" aria-label="Ladegeräte verbinden">⌁</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section id="devicesView" class="app-view">
+      <section id="emptyState" class="empty-state">
+        <p class="eyebrow">BLUETOOTH</p>
+        <h2>Noch kein Ladegerät eingerichtet</h2>
+        <button class="primary" data-action="open-connection-manager">Geräte suchen</button>
+      </section>
+
+      <div id="deviceList" class="device-list"></div>
+    </section>
+
+    <section id="profilesView" class="app-view" hidden>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">PROFILBIBLIOTHEK</p>
+          <h2>Ladeprofile</h2>
+        </div>
+        <button class="primary" data-action="new-profile">Neues Profil</button>
+      </header>
+      <div
+        id="profileCategoryFilters"
+        class="profile-category-filters"
+        role="navigation"
+        aria-label="Profilkategorien"
+      ></div>
+      <p id="profileCategoryDescription" class="profile-category-description"></p>
+      <div class="profile-table-wrap">
+        <table class="data-table profile-table">
+          <colgroup>
+            <col class="profile-col-name">
+            <col class="profile-col-category">
+            <col class="profile-col-type">
+            <col class="profile-col-mode">
+            <col class="profile-col-current">
+            <col class="profile-col-voltage">
+            <col class="profile-col-actions">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Kategorie</th>
+              <th>Akkutyp</th>
+              <th>Programm</th>
+              <th>Ladestrom</th>
+              <th>Endspannung</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="profileList"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="batteryManagerView" class="app-view" hidden>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">LANGZEITARCHIV</p>
+          <h2>Batteriemanager</h2>
+        </div>
+        <div class="page-head-actions">
+          <button id="batteryArchiveToggle" data-action="toggle-battery-archive">Archiv öffnen</button>
+          <button class="primary" data-action="new-battery">Neue Batterie</button>
+        </div>
+      </header>
+
+      <details class="pack-builder-panel">
+        <summary>
+          <span>
+            <strong>Zellen-Sortierer / Pack-Builder</strong>
+            <small>Getestete Zellen nach Kapazität und Innenwiderstand gruppieren</small>
+          </span>
+        </summary>
+        <form id="packBuilderForm">
+          <div class="pack-builder-settings">
+            <label>Zellen pro Gruppe
+              <input id="packCellsPerGroup" type="number" min="2" max="16" value="4" required>
+            </label>
+            <label>Anzahl Gruppen
+              <input id="packGroupCount" type="number" min="1" max="16" value="1" required>
+            </label>
+            <label>Max. Kapazitätsabweichung
+              <span class="input-unit"><input id="packCapacitySpread" type="number" min="0.1" max="50" step="0.1" value="5" required><span>%</span></span>
+            </label>
+            <label>Max. Widerstandsabweichung
+              <span class="input-unit"><input id="packResistanceSpread" type="number" min="0.1" max="100" step="0.1" value="20" required><span>%</span></span>
+            </label>
+          </div>
+          <div id="packBatterySelection" class="pack-cell-selection"></div>
+          <div class="dialog-actions">
+            <button type="submit" class="primary">Passende Gruppen berechnen</button>
+          </div>
+        </form>
+        <div id="packBuilderResult" class="pack-builder-result"></div>
+      </details>
+
+      <div class="battery-manager-layout">
+        <aside class="battery-directory">
+          <form id="batteryLookupForm" class="battery-lookup">
+            <label for="batteryLookup">Batterienummer</label>
+            <div>
+              <input id="batteryLookup" maxlength="32" placeholder="z. B. 001" autocomplete="off">
+              <button type="submit">Öffnen</button>
+            </div>
+          </form>
+          <div id="batteryList" class="battery-list"></div>
+        </aside>
+
+        <section class="battery-workspace">
+          <div id="batteryDetailEmpty" class="battery-detail-empty">
+            <p class="eyebrow">BATTERIEAKTE</p>
+            <h3>Batterie auswählen oder neu anlegen</h3>
+          </div>
+
+          <div id="batteryDetail" hidden>
+            <header class="battery-detail-head">
+              <div>
+                <p id="batteryDetailType" class="eyebrow">BATTERIE</p>
+                <h3 id="batteryDetailTitle">001</h3>
+                <p id="batteryDetailMeta" class="battery-detail-meta"></p>
+              </div>
+              <div class="battery-detail-actions">
+                <button data-action="battery-qr">QR-Etikett</button>
+                <button data-action="battery-sheet-pdf">Steckblatt PDF</button>
+                <button data-action="export-battery">CSV exportieren</button>
+                <button data-action="edit-battery">Bearbeiten</button>
+                <button class="primary" data-action="standard-program">Standardprogramm</button>
+                <button id="batteryArchiveAction" class="danger-quiet" data-action="archive-battery">Archivieren</button>
+                <button id="batteryDeleteAction" class="danger" data-action="delete-battery-permanently" hidden>Endgültig löschen</button>
+              </div>
+            </header>
+
+            <div id="batteryStats" class="battery-stats"></div>
+
+            <section class="battery-compare-section">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">VERGLEICH</p>
+                  <h3>Lade- und Entladekurven</h3>
+                </div>
+                <div class="compare-controls">
+                  <label>Messwert
+                    <select id="batteryCompareMetric">
+                      <option value="voltage_v">Spannung</option>
+                      <option value="current_a">Strom</option>
+                      <option value="capacity_mah">Kapazität</option>
+                      <option value="temperature_c">Temperatur</option>
+                      <option value="resistance_mohm">Innenwiderstand</option>
+                    </select>
+                  </label>
+                  <button data-action="compare-battery-runs">Auswahl vergleichen</button>
+                </div>
+              </div>
+              <div id="batteryCompareLegend" class="compare-legend"></div>
+              <div class="chart-zoom-tools">
+                <span>Ziehen oder zwei Punkte anklicken: zoomen · Doppelklick: zurück</span>
+                <button type="button" data-action="reset-chart-zoom" data-chart-group="battery-comparison" hidden>Zoom zurücksetzen</button>
+              </div>
+              <canvas id="batteryCompareChart"></canvas>
+            </section>
+
+            <section class="battery-runs-section">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">HISTORIE</p>
+                  <h3>Gespeicherte Programmläufe</h3>
+                </div>
+                <span class="selection-note">Bis zu 5 Läufe auswählen</span>
+              </div>
+              <div class="profile-table-wrap">
+                <table class="data-table battery-runs-table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>Beginn</th>
+                      <th>Programm</th>
+                      <th>Gerät / Slot</th>
+                      <th>Kapazität</th>
+                      <th>Soll / Ist</th>
+                      <th>Innenwiderstand</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="batteryRuns"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="recordingsView" class="app-view" hidden>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">ZEITREIHEN</p>
+          <h2>Aufzeichnungen</h2>
+        </div>
+        <div class="history-actions">
+          <button data-action="refresh-history">Aktualisieren</button>
+          <button class="primary" data-action="export-history">CSV exportieren</button>
+        </div>
+      </header>
+
+      <div class="history-toolbar">
+        <label>Ladegerät
+          <select id="historyDevice"></select>
+        </label>
+        <label>Slot
+          <select id="historySlot">
+            <option value="1">Slot 1</option>
+            <option value="2">Slot 2</option>
+            <option value="3">Slot 3</option>
+            <option value="4">Slot 4</option>
+          </select>
+        </label>
+        <label>Zeitraum
+          <select id="historyHours">
+            <option value="1">Letzte Stunde</option>
+            <option value="6">Letzte 6 Stunden</option>
+            <option value="24" selected>Letzte 24 Stunden</option>
+            <option value="168">Letzte 7 Tage</option>
+            <option value="720">Letzte 30 Tage</option>
+          </select>
+        </label>
+        <div id="historySummary" class="history-summary">Noch keine Daten geladen</div>
+      </div>
+
+      <div class="chart-zoom-tools">
+        <span>Ziehen oder zwei Punkte anklicken: zoomen · Doppelklick: zurück</span>
+        <button type="button" data-action="reset-chart-zoom" data-chart-group="history" hidden>Zoom zurücksetzen</button>
+      </div>
+      <div class="chart-phase-legend" aria-label="Programmphasen">
+        <span><i class="phase-charge"></i>Laden</span>
+        <span><i class="phase-pause"></i>Pause</span>
+        <span><i class="phase-discharge"></i>Entladen</span>
+        <span><i class="phase-idle"></i>Außerhalb eines Programms</span>
+      </div>
+
+      <div class="chart-stack">
+        <section class="history-chart">
+          <header>
+            <h3>Spannung und Strom</h3>
+            <div class="chart-legend">
+              <span><i class="legend-voltage"></i>Spannung V</span>
+              <span><i class="legend-current"></i>Strom A</span>
+            </div>
+          </header>
+          <canvas id="voltageCurrentChart"></canvas>
+        </section>
+        <section class="history-chart">
+          <header>
+            <h3>Temperatur und Innenwiderstand</h3>
+            <div class="chart-legend">
+              <span><i class="legend-temperature"></i>Temperatur °C</span>
+              <span><i class="legend-resistance"></i>Innenwiderstand mΩ</span>
+            </div>
+          </header>
+          <canvas id="temperatureResistanceChart"></canvas>
+        </section>
+        <section class="history-chart">
+          <header>
+            <h3>Kapazität</h3>
+            <div class="chart-legend">
+              <span><i class="legend-capacity"></i>Kapazität mAh</span>
+            </div>
+          </header>
+          <canvas id="capacityChart"></canvas>
+        </section>
+      </div>
+
+      <section class="runs-section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">PROGRAMMLÄUFE</p>
+            <h3>Letzte Lade- und Entladevorgänge</h3>
+          </div>
+        </div>
+        <div class="profile-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Beginn</th>
+                <th>Gerät</th>
+                <th>Slot</th>
+                <th>Programm</th>
+                <th>Dauer</th>
+                <th>Kapazität</th>
+                <th>Soll / Ist</th>
+                <th>Max. Temperatur</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="recordingRuns"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="settingsView" class="app-view" hidden>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">VERHALTEN</p>
+          <h2>Einstellungen</h2>
+        </div>
+      </header>
+      <form id="settingsForm" class="settings-panel">
+        <div>
+          <h3>Darstellung</h3>
+          <p>Die Auswahl gilt für die gesamte Oberfläche einschließlich Dialogen und Diagrammen.</p>
+        </div>
+        <label>Farbschema
+          <select id="settingsTheme">
+            <option value="system">Systemeinstellung verwenden</option>
+            <option value="light">Hell</option>
+            <option value="dark">Dunkel</option>
+          </select>
+        </label>
+        <div class="settings-divider"></div>
+        <div>
+          <h3>Vorauswahl für neue Slots</h3>
+          <p>
+            Diese Auswahl wird im Programmfenster nur vorgeschlagen. Sie wird niemals
+            automatisch an das Ladegerät übertragen oder gestartet.
+          </p>
+        </div>
+        <label>Vorgeschlagenes Programm
+          <select id="settingsDefaultProgram"></select>
+        </label>
+        <p class="form-note">
+          Standardmäßig ist kein Programm gewählt. Bereits vorbereitete Slots behalten
+          ihre eigene Auswahl bis zum Ende des Programmlaufs.
+        </p>
+        <div class="settings-divider"></div>
+        <div>
+          <h3>Diagrammfarben</h3>
+          <p>Livekarten und zeitbasierte Diagramme färben Laden, Pause und Entladen dezent ein. Zeiten außerhalb eines Programms bleiben neutral.</p>
+        </div>
+        <label>Deckkraft der Phasenflächen
+          <span class="range-setting">
+            <input id="settingsPhaseOpacity" type="range" min="15" max="25" step="1" value="15">
+            <output id="settingsPhaseOpacityValue" for="settingsPhaseOpacity">15 %</output>
+          </span>
+        </label>
+        <p class="form-note">Einstellbar von 15 bis maximal 25 %. Start-/Stopp-Linien werden nicht mehr dargestellt.</p>
+        <div class="settings-divider"></div>
+        <div>
+          <h3>Seitenschutz</h3>
+          <p>Optionaler Login für Oberfläche, API und Live-Verbindung.</p>
+        </div>
+        <label class="checkbox-field">
+          <input id="settingsLoginEnabled" type="checkbox">
+          <span>Login aktivieren</span>
+        </label>
+        <div id="settingsLoginFields" class="settings-login-fields" hidden>
+          <label>Benutzername
+            <input id="settingsLoginUsername" maxlength="80" autocomplete="username">
+          </label>
+          <label>Passwort
+            <input id="settingsLoginPassword" type="password" minlength="8" maxlength="200" autocomplete="new-password" placeholder="Leer lassen = unverändert">
+          </label>
+          <p class="form-note">Das Passwort wird sicher gehasht gespeichert. Bei unverschlüsseltem HTTP schützt ein VPN oder HTTPS zusätzlich die Übertragung.</p>
+          <button id="settingsLogoutButton" type="button" data-action="logout">Jetzt abmelden</button>
+        </div>
+        <div class="dialog-actions">
+          <button type="submit" class="primary">Einstellungen speichern</button>
+        </div>
+      </form>
+      <section class="settings-panel backup-panel">
+        <div>
+          <h3>Datensicherung</h3>
+          <p>
+            Das Backup enthält Profile, Batterieakten, Messwerte und Einstellungen.
+            Vor einer Wiederherstellung wird automatisch ein Rückfall-Backup angelegt.
+          </p>
+        </div>
+        <div class="backup-actions">
+          <button class="primary" data-action="download-backup">Backup herunterladen</button>
+          <label class="file-button">Backup wiederherstellen
+            <input id="restoreBackupFile" type="file" accept=".zip,application/zip">
+          </label>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <details id="versionBadge" class="version-badge">
+    <summary>v<span id="appVersion">--</span></summary>
+    <div class="version-panel">
+      <p class="eyebrow">AKTUELLE VERSION</p>
+      <strong>Version <span id="appVersionTitle">--</span></strong>
+      <ul id="appFixes">
+        <li>Versionsinformationen werden geladen...</li>
+      </ul>
+    </div>
+  </details>
+
+  <dialog id="connectionManagerDialog" class="connection-manager-dialog">
+    <div class="dialog-head">
+      <div>
+        <p class="eyebrow">BLUETOOTH</p>
+        <h2>Verbindungs&shy;manager</h2>
+      </div>
+      <button type="button" class="icon-button" data-action="close-dialog" data-dialog="connectionManagerDialog" aria-label="Schließen">×</button>
+    </div>
+    <p class="connection-manager-note">
+      Die Suche läuft parallel. Bereits verbundene Ladegeräte bleiben verbunden.
+    </p>
+    <section class="connection-manager-section">
+      <div class="connection-manager-section-head">
+        <div>
+          <h3>Eingerichtete Ladegeräte</h3>
+          <p>Verbindung trennen, Gerätedaten bearbeiten oder Geräte dauerhaft entfernen.</p>
+        </div>
+      </div>
+      <div id="connectionManagerRegistered" class="connection-manager-list"></div>
+    </section>
+    <section class="connection-manager-section">
+      <div class="connection-manager-section-head">
+        <div>
+          <h3>Verfügbare Ladegeräte</h3>
+          <p id="connectionManagerScanStatus">Suche noch nicht gestartet.</p>
+        </div>
+        <button id="connectionManagerScanButton" class="primary" data-action="scan-devices">Neu suchen</button>
+      </div>
+      <div id="connectionManagerDiscovered" class="connection-manager-list"></div>
+    </section>
+    <div class="dialog-actions">
+      <button type="button" data-action="close-dialog" data-dialog="connectionManagerDialog">Schließen</button>
+    </div>
+  </dialog>
+
+  <dialog id="renameDialog">
+    <form method="dialog" id="renameForm">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">GERÄT</p>
+          <h2>Gerätedaten bearbeiten</h2>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="renameDialog" aria-label="Schließen">×</button>
+      </div>
+      <input type="hidden" id="renameAddress">
+      <label>Name
+        <input id="renameAlias" maxlength="60" required autocomplete="off">
+      </label>
+      <label>Seriennummer (optional)
+        <input id="renameSerialNumber" maxlength="80" autocomplete="off" placeholder="Vom Typenschild übernehmen">
+      </label>
+      <div class="dialog-actions">
+        <button type="button" data-action="close-dialog" data-dialog="renameDialog">Abbrechen</button>
+        <button type="submit" value="default" class="primary">Speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="slotConfigurationDialog">
+    <form method="dialog" id="slotConfigurationForm">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">SLOT EINRICHTEN</p>
+          <h2 id="slotConfigurationTitle">Programm und Batterie</h2>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="slotConfigurationDialog" aria-label="Schließen">×</button>
+      </div>
+      <input type="hidden" id="slotConfigurationAddress">
+      <input type="hidden" id="slotConfigurationSlot">
+      <input type="hidden" id="slotConfigurationStartAfter" value="0">
+      <div id="slotConfigurationFacts" class="apply-profile-facts"></div>
+      <label>Batterieakte (optional)
+        <select id="slotConfigurationBattery"></select>
+      </label>
+      <label>Programm
+        <select id="slotConfigurationProgram" required></select>
+      </label>
+      <label id="slotConfigurationCapacityField" hidden>Kapazität für diesen Slot (mAh)
+        <input id="slotConfigurationCapacity" type="number" min="0" max="50000" step="10">
+      </label>
+      <label id="slotConfigurationTimeLimitModeField" hidden>Zeitlimit
+        <select id="slotConfigurationTimeLimitMode">
+          <option value="automatic">Automatisch</option>
+          <option value="manual" selected>Manuell</option>
+          <option value="off">Aus</option>
+        </select>
+      </label>
+      <label id="slotConfigurationTimeLimitField" hidden>Manuelles Zeitlimit
+        <span class="input-unit"><input id="slotConfigurationTimeLimitHours" type="number" min="0.25" max="24" step="0.25" value="6"><span>h</span></span>
+      </label>
+      <div id="slotConfigurationPreview" class="slot-configuration-preview"></div>
+      <div class="dialog-actions">
+        <button type="button" data-action="close-dialog" data-dialog="slotConfigurationDialog">Abbrechen</button>
+        <button id="slotConfigurationSubmit" type="submit" class="primary">Für Slot übernehmen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="deviceConfigurationDialog" class="device-configuration-dialog">
+    <form method="dialog" id="deviceConfigurationForm">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">ALLE SLOTS EINRICHTEN</p>
+          <h2 id="deviceConfigurationTitle">Programme vorbereiten</h2>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="deviceConfigurationDialog" aria-label="Schließen">×</button>
+      </div>
+      <input type="hidden" id="deviceConfigurationAddress">
+      <input type="hidden" id="deviceConfigurationStartAfter" value="0">
+      <div id="deviceConfigurationFacts" class="apply-profile-facts"></div>
+      <label>Programm für alle Slots
+        <select id="deviceConfigurationProgram" required></select>
+      </label>
+      <label id="deviceConfigurationTimeLimitModeField" hidden>Zeitlimit
+        <select id="deviceConfigurationTimeLimitMode">
+          <option value="automatic">Automatisch</option>
+          <option value="manual" selected>Manuell</option>
+          <option value="off">Aus</option>
+        </select>
+      </label>
+      <label id="deviceConfigurationTimeLimitField" hidden>Manuelles Zeitlimit
+        <span class="input-unit"><input id="deviceConfigurationTimeLimitHours" type="number" min="0.25" max="24" step="0.25" value="6"><span>h</span></span>
+      </label>
+      <div id="deviceConfigurationSlots" class="device-configuration-slots"></div>
+      <div id="deviceConfigurationPreview" class="slot-configuration-preview"></div>
+      <div class="dialog-actions">
+        <button type="button" data-action="close-dialog" data-dialog="deviceConfigurationDialog">Abbrechen</button>
+        <button id="deviceConfigurationSubmit" type="submit" class="primary">Programme übernehmen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="curveDialog" class="curve-dialog">
+    <div class="dialog-head">
+      <div>
+        <p class="eyebrow">SPANNUNGSVERLAUF</p>
+        <h2 id="curveTitle">Slot</h2>
+      </div>
+      <button class="icon-button" data-action="close-curve" aria-label="Schließen">×</button>
+    </div>
+    <canvas id="curveCanvas" width="1100" height="420"></canvas>
+    <div class="chart-zoom-tools">
+      <span>Ziehen oder zwei Punkte anklicken: zoomen · Doppelklick: zurück</span>
+      <button type="button" data-action="reset-chart-zoom" data-chart-group="curve" hidden>Zoom zurücksetzen</button>
+    </div>
+    <p id="curveMeta" class="curve-meta">Lade Daten...</p>
+  </dialog>
+
+  <dialog id="profileDialog" class="profile-dialog">
+    <form method="dialog" id="profileForm">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">PROFIL</p>
+          <h2 id="profileDialogTitle">Ladeprofil erstellen</h2>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="profileDialog" aria-label="Schließen">×</button>
+      </div>
+      <input type="hidden" id="profileId">
+      <div class="profile-form-grid">
+        <label class="span-2">Name
+          <input id="profileName" maxlength="80" required autocomplete="off">
+        </label>
+        <label class="span-2">Beschreibung
+          <textarea id="profileDescription" maxlength="500" rows="2"></textarea>
+        </label>
+        <label>Akkutyp
+          <select id="profileBatteryType" required></select>
+        </label>
+        <label>Kategorie
+          <select id="profileCategory" required></select>
+        </label>
+        <label>Programm
+          <select id="profileMode" required></select>
+        </label>
+        <label>Kapazität
+          <span class="input-unit"><input id="profileCapacity" type="number" min="0" max="50000" step="100" required><span>mAh</span></span>
+        </label>
+        <label>Ladestrom
+          <span class="input-unit"><input id="profileChargeCurrent" type="number" min="0.05" max="3" step="0.01" required><span>A</span></span>
+        </label>
+        <label>Entladestrom
+          <span class="input-unit"><input id="profileDischargeCurrent" type="number" min="0.05" max="2" step="0.01" required><span>A</span></span>
+        </label>
+        <label>Lade-Endspannung
+          <span class="input-unit"><input id="profileChargeVoltage" type="number" step="0.01" required><span>V</span></span>
+        </label>
+        <label>Entlade-Endspannung
+          <span class="input-unit"><input id="profileDischargeVoltage" type="number" step="0.01" required><span>V</span></span>
+        </label>
+        <label>Lade-Abschaltstrom
+          <span class="input-unit"><input id="profileChargeEndCurrent" type="number" min="0" max="3" step="0.01" required><span>A</span></span>
+        </label>
+        <label>Entlade-Abschaltstrom
+          <span class="input-unit"><input id="profileDischargeEndCurrent" type="number" min="0" max="2" step="0.01" required><span>A</span></span>
+        </label>
+        <label>Ladepause
+          <span class="input-unit"><input id="profileChargeRest" type="number" min="0" max="240" step="1" required><span>min</span></span>
+        </label>
+        <label>Entladepause
+          <span class="input-unit"><input id="profileDischargeRest" type="number" min="0" max="240" step="1" required><span>min</span></span>
+        </label>
+        <label>Zyklen
+          <input id="profileCycleCount" type="number" min="1" max="99" step="1" required>
+        </label>
+        <label>Zyklusfolge
+          <select id="profileCycleMode">
+            <option value="0">C&gt;D</option>
+            <option value="1">C&gt;D&gt;C</option>
+            <option value="2">D&gt;C</option>
+            <option value="3">D&gt;C&gt;D</option>
+          </select>
+        </label>
+        <label>Delta-Peak
+          <span class="input-unit"><input id="profileDeltaPeak" type="number" min="0" max="20" step="1" required><span>mV</span></span>
+        </label>
+        <label>Erhaltungsstrom
+          <span class="input-unit"><input id="profileTrickleCurrent" type="number" min="0" max="300" step="10" required><span>mA</span></span>
+        </label>
+        <label>Erhaltungsspannung
+          <span class="input-unit"><input id="profileKeepVoltage" type="number" min="0" step="0.01" required><span>V</span></span>
+        </label>
+        <label>Temperaturlimit
+          <span class="input-unit"><input id="profileTempLimit" type="number" min="0" max="70" step="1" required><span>°C</span></span>
+        </label>
+        <label>Zeitlimit
+          <select id="profileTimeLimitMode" required>
+            <option value="automatic">Automatisch</option>
+            <option value="manual" selected>Manuell</option>
+            <option value="off">Aus</option>
+          </select>
+        </label>
+        <label id="profileTimeLimitField">Manuelles Zeitlimit
+          <span class="input-unit"><input id="profileTimeLimit" type="number" min="0.25" max="24" step="0.25" value="6" required><span>h</span></span>
+        </label>
+      </div>
+      <div id="profileValidationHint" class="form-hint"></div>
+      <div class="dialog-actions">
+        <button type="button" data-action="close-dialog" data-dialog="profileDialog">Abbrechen</button>
+        <button type="submit" class="primary">Profil speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="automaticProfileDialog" class="profile-dialog">
+    <form method="dialog" id="automaticProfileForm">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">AUTOMATIKPROFIL</p>
+          <h2 id="automaticProfileDialogTitle">Automatikprofil bearbeiten</h2>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="automaticProfileDialog" aria-label="Schließen">×</button>
+      </div>
+      <input type="hidden" id="automaticProfileKey">
+      <div class="profile-form-grid">
+        <label class="span-2">Name
+          <input id="automaticProfileName" maxlength="80" required autocomplete="off">
+        </label>
+        <label class="span-2">Beschreibung
+          <textarea id="automaticProfileDescription" maxlength="500" rows="2"></textarea>
+        </label>
+        <label>Programm
+          <select id="automaticProfileMode" required></select>
+        </label>
+        <label>Kategorie
+          <select id="automaticProfileCategory" required></select>
+        </label>
+        <label>Temperaturlimit
+          <span class="input-unit"><input id="automaticProfileTempLimit" type="number" min="0" max="70" step="1" value="45" required><span>°C</span></span>
+        </label>
+        <label>Lade-C-Rate
+          <span class="input-unit"><input id="automaticProfileChargeRate" type="number" min="0.05" max="2" step="0.05" required><span>C</span></span>
+        </label>
+        <label>Entlade-C-Rate
+          <span class="input-unit"><input id="automaticProfileDischargeRate" type="number" min="0.05" max="2" step="0.05" required><span>C</span></span>
+        </label>
+        <label>Ladepause
+          <span class="input-unit"><input id="automaticProfileChargeRest" type="number" min="0" max="240" step="1" required><span>min</span></span>
+        </label>
+        <label>Entladepause
+          <span class="input-unit"><input id="automaticProfileDischargeRest" type="number" min="0" max="240" step="1" required><span>min</span></span>
+        </label>
+        <label>Zyklen
+          <input id="automaticProfileCycleCount" type="number" min="1" max="99" step="1" required>
+        </label>
+        <label>Zyklusfolge
+          <select id="automaticProfileCycleMode" required></select>
+        </label>
+        <label>Zeitlimit
+          <select id="automaticProfileTimeLimitMode" required>
+            <option value="automatic">Automatisch</option>
+            <option value="manual">Manuell</option>
+            <option value="off">Aus</option>
+          </select>
+        </label>
+        <label id="automaticProfileTimeLimitField">Manuelles Zeitlimit
+          <span class="input-unit"><input id="automaticProfileTimeLimitHours" type="number" min="0.25" max="24" step="0.25" value="6" required><span>h</span></span>
+        </label>
+      </div>
+      <div id="automaticProfileValidationHint" class="form-hint"></div>
+      <div class="dialog-actions">
+        <button type="button" data-action="close-dialog" data-dialog="automaticProfileDialog">Abbrechen</button>
+        <button type="submit" class="primary">Automatikprofil speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="applyProfileDialog">
+    <form method="dialog" id="applyProfileForm">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">ÜBERTRAGEN</p>
+          <h2>Profil anwenden</h2>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="applyProfileDialog" aria-label="Schließen">×</button>
+      </div>
+      <input type="hidden" id="applyProfileId">
+      <div id="applyProfileFacts" class="apply-profile-facts"></div>
+      <label>Ladegerät
+        <select id="applyProfileDevice" required></select>
+      </label>
+      <fieldset class="slot-picker">
+        <legend>Slots</legend>
+        <label><input type="checkbox" name="applySlot" value="1"> Slot 1</label>
+        <label><input type="checkbox" name="applySlot" value="2"> Slot 2</label>
+        <label><input type="checkbox" name="applySlot" value="3"> Slot 3</label>
+        <label><input type="checkbox" name="applySlot" value="4"> Slot 4</label>
+      </fieldset>
+      <label id="applyProfileConfirmLabel">Bestätigung: PROFIL ANWENDEN
+        <input id="applyProfileConfirmation" required autocomplete="off" spellcheck="false">
+      </label>
+      <div class="dialog-actions">
+        <button type="button" data-action="close-dialog" data-dialog="applyProfileDialog">Abbrechen</button>
+        <button type="submit" class="primary">An Slots übertragen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="batteryDialog">
+    <form method="dialog" id="batteryForm">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">BATTERIEAKTE</p>
+          <h2 id="batteryDialogTitle">Batterie anlegen</h2>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="batteryDialog" aria-label="Schließen">×</button>
+      </div>
+      <input type="hidden" id="batteryId">
+      <div class="profile-form-grid">
+        <label>Batterienummer
+          <input id="batteryCode" maxlength="32" required autocomplete="off" placeholder="001">
+        </label>
+        <label>Name
+          <input id="batteryName" maxlength="80" autocomplete="off" placeholder="z. B. Taschenlampe links">
+        </label>
+        <label>Chemie
+          <select id="batteryType" required></select>
+        </label>
+        <label>Nennkapazität
+          <span class="input-unit"><input id="batteryCapacity" type="number" min="100" max="50000" step="10" required><span>mAh</span></span>
+        </label>
+        <label>Hersteller
+          <input id="batteryManufacturer" maxlength="80" autocomplete="off" list="batteryManufacturerSuggestions" placeholder="z. B. Samsung">
+        </label>
+        <label>Typ / Modell
+          <input id="batteryModel" maxlength="80" autocomplete="off" list="batteryModelSuggestions" placeholder="z. B. INR18650-30Q">
+        </label>
+        <label>Bauform
+          <input id="batteryFormFactor" maxlength="40" autocomplete="off" list="batteryFormFactorSuggestions" placeholder="z. B. 18650 oder Pouch">
+        </label>
+        <label>Herkunft
+          <input id="batteryOrigin" maxlength="120" autocomplete="off" list="batteryOriginSuggestions" placeholder="z. B. Akkupack, Gerät oder Lieferant">
+        </label>
+        <label>In Betrieb seit
+          <input id="batteryInServiceSince" type="date">
+        </label>
+        <label class="checkbox-field">
+          <input id="batteryProtected" type="checkbox">
+          <span>Protection vorhanden</span>
+        </label>
+        <label class="span-2">Notizen
+          <textarea id="batteryNotes" maxlength="1000" rows="4"></textarea>
+        </label>
+      </div>
+      <datalist id="batteryManufacturerSuggestions"></datalist>
+      <datalist id="batteryModelSuggestions"></datalist>
+      <datalist id="batteryFormFactorSuggestions"></datalist>
+      <datalist id="batteryOriginSuggestions"></datalist>
+      <p class="form-note">Das Speichern ändert nur die Batterieakte. Ein laufendes Programm wird nicht verändert oder unterbrochen.</p>
+      <div class="dialog-actions">
+        <button type="button" data-action="close-dialog" data-dialog="batteryDialog">Abbrechen</button>
+        <button type="submit" class="primary">Batterie speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="standardProgramDialog" class="standard-program-dialog">
+    <form method="dialog" id="standardProgramForm">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">STANDARDPROGRAMM</p>
+          <h2 id="standardProgramTitle">Batterie 001</h2>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="standardProgramDialog" aria-label="Schließen">×</button>
+      </div>
+      <input type="hidden" id="standardBatteryId">
+      <div id="standardBatteryFacts" class="apply-profile-facts"></div>
+      <div class="profile-form-grid">
+        <label>Programm
+          <select id="standardMode" required></select>
+        </label>
+        <label>Lade-C-Rate
+          <span class="input-unit"><input id="standardChargeRate" type="number" min="0.05" max="2" step="0.05" value="0.5" required><span>C</span></span>
+        </label>
+        <label>Entlade-C-Rate
+          <span class="input-unit"><input id="standardDischargeRate" type="number" min="0.05" max="2" step="0.05" value="0.5" required><span>C</span></span>
+        </label>
+        <label>Zyklen
+          <input id="standardCycleCount" type="number" min="1" max="99" step="1" value="1" required>
+        </label>
+        <label class="span-2">Zyklusfolge
+          <select id="standardCycleMode"></select>
+        </label>
+        <label>Zeitlimit
+          <select id="standardTimeLimitMode" required>
+            <option value="automatic">Automatisch</option>
+            <option value="manual" selected>Manuell</option>
+            <option value="off">Aus</option>
+          </select>
+        </label>
+        <label id="standardTimeLimitField">Manuelles Zeitlimit
+          <span class="input-unit"><input id="standardTimeLimitHours" type="number" min="0.25" max="24" step="0.25" value="6" required><span>h</span></span>
+        </label>
+      </div>
+      <div id="standardProgramPreview" class="standard-program-preview"></div>
+      <div class="dialog-actions">
+        <button type="button" data-action="close-dialog" data-dialog="standardProgramDialog">Abbrechen</button>
+        <button type="submit" class="primary">Standardprogramm speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="runReportDialog" class="run-report-dialog">
+    <div class="dialog-head">
+      <div>
+        <p class="eyebrow">ABSCHLUSSBERICHT</p>
+        <h2 id="runReportTitle">Programmlauf</h2>
+      </div>
+      <button type="button" class="icon-button" data-action="close-dialog" data-dialog="runReportDialog" aria-label="Schließen">×</button>
+    </div>
+    <div id="runReportContent" class="run-report-content"></div>
+  </dialog>
+
+  <dialog id="runChartDialog" class="run-chart-dialog">
+    <div class="dialog-head">
+      <div>
+        <p class="eyebrow">BERICHTSDIAGRAMM</p>
+        <h2 id="runChartTitle">Programmlauf</h2>
+      </div>
+      <button type="button" class="icon-button" data-action="close-dialog" data-dialog="runChartDialog" aria-label="Schließen">×</button>
+    </div>
+    <p id="runChartMeta" class="curve-meta">Lade Daten...</p>
+    <div class="chart-zoom-tools">
+      <span>Ziehen oder zwei Punkte anklicken: zoomen · Doppelklick: zurück</span>
+      <button type="button" data-action="reset-chart-zoom" data-chart-group="run" hidden>Zoom zurücksetzen</button>
+    </div>
+    <div class="chart-phase-legend" aria-label="Programmphasen">
+      <span><i class="phase-charge"></i>Laden</span>
+      <span><i class="phase-pause"></i>Pause</span>
+      <span><i class="phase-discharge"></i>Entladen</span>
+      <span><i class="phase-idle"></i>Außerhalb eines Programms</span>
+    </div>
+    <div class="chart-stack">
+      <section class="history-chart">
+        <header>
+          <h3>Spannung und Strom</h3>
+          <div class="chart-legend">
+            <span><i class="legend-voltage"></i>Spannung V</span>
+            <span><i class="legend-current"></i>Strom A</span>
+          </div>
+        </header>
+        <canvas id="runVoltageCurrentChart"></canvas>
+      </section>
+      <section class="history-chart">
+        <header>
+          <h3>Temperatur und Innenwiderstand</h3>
+          <div class="chart-legend">
+            <span><i class="legend-temperature"></i>Temperatur °C</span>
+            <span><i class="legend-resistance"></i>Innenwiderstand mΩ</span>
+          </div>
+        </header>
+        <canvas id="runTemperatureResistanceChart"></canvas>
+      </section>
+      <section class="history-chart">
+        <header>
+          <h3>Kapazität</h3>
+          <div id="runCapacityLegend" class="chart-legend run-capacity-legend">
+            <span><i class="legend-capacity"></i>Ist-Verlauf mAh</span>
+          </div>
+        </header>
+        <canvas id="runCapacityChart"></canvas>
+      </section>
+    </div>
+  </dialog>
+
+  <dialog id="notificationDialog" class="notification-dialog">
+    <div class="dialog-head">
+      <div>
+        <p class="eyebrow">MELDUNGEN</p>
+        <h2>Abgeschlossene Programme</h2>
+      </div>
+      <button type="button" class="icon-button" data-action="close-dialog" data-dialog="notificationDialog" aria-label="Schließen">×</button>
+    </div>
+    <div id="notificationList" class="notification-list"></div>
+    <div class="dialog-actions">
+      <button data-action="enable-browser-notifications">Browser-Meldungen aktivieren</button>
+      <button class="primary" data-action="mark-notifications-read">Als gelesen markieren</button>
+    </div>
+  </dialog>
+
+  <script src="/static/app.js?v=34"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+[Unit]
+Description=MC3000 Control
+After=bluetooth.service network-online.target
+Wants=network-online.target
+Requires=bluetooth.service
+
+[Service]
+Type=simple
+User=mc3000-control
+Group=mc3000-control
+SupplementaryGroups=bluetooth
+WorkingDirectory=/opt/mc3000-control/current
+Environment=MC3000_HOST=0.0.0.0
+Environment=MC3000_PORT=8083
+Environment=MC3000_DATA_DIR=/var/lib/mc3000-control
+Environment=MC3000_LOG_LEVEL=INFO
+Environment=MC3000_RECORD_ACTIVE_INTERVAL=2
+Environment=MC3000_RECORD_IDLE_INTERVAL=30
+Environment=MC3000_RETENTION_DAYS=90
+Environment=MC3000_ARCHIVED_BATTERY_RETENTION_DAYS=30
+ExecStart=/opt/mc3000-control/current/.venv/bin/mc3000-control
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mc3000-control
+
+[Install]
+WantedBy=multi-user.target
