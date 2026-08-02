@@ -1,4 +1,4 @@
-"""MC3000 Control."""
+"""Open MC3000 Control."""
 
 __version__ = "1.0.0"
 

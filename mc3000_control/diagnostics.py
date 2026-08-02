@@ -73,7 +73,7 @@ def create_diagnostics(
 
     summary = {
         "generated_at": datetime.now(UTC).isoformat(),
-        "application": {"name": "MC3000 Control", "version": version},
+        "application": {"name": "Open MC3000 Control", "version": version},
         "runtime": {
             "python": platform.python_version(),
             "system": platform.system(),

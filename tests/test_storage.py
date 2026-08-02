@@ -597,6 +597,49 @@ def test_battery_store_persists_standard_program(tmp_path) -> None:
     assert loaded.to_dict()["standard_program"]["mode"] == "Zyklus"
 
 
+def test_battery_store_persists_catalog_metadata_and_technical_values(tmp_path) -> None:
+    store = BatteryStore(tmp_path / "mc3000.db")
+    stored = store.save(
+        BatteryValues(
+            code="CAT-1",
+            name="Katalogzelle",
+            battery_type_code=0,
+            nominal_capacity_mah=3000,
+            notes="",
+            manufacturer="Samsung",
+            model="INR18650-30Q",
+            form_factor="18650",
+            chemistry_detail="NMC",
+            weight_g=48.1,
+            nominal_voltage_v=3.6,
+            min_voltage_v=2.5,
+            max_voltage_v=4.2,
+            max_charge_current_a=4,
+            max_discharge_current_a=15,
+            cycle_life=500,
+            manufacture_year=2020,
+            dimensions="Ø 18,3 × 65 mm",
+            data_source_name="BetterBat",
+            data_source_url="https://example.com/cell",
+            data_source_retrieved_at="2026-08-02T10:00:00+00:00",
+            technical_notes="Wert vor Verwendung prüfen.",
+            technical_data={"Document ID": "TEST-30Q", "Rated Ah": "3"},
+        )
+    )
+
+    loaded = store.get(stored.id)
+
+    assert loaded is not None
+    assert loaded.values.weight_g == 48.1
+    assert loaded.values.nominal_voltage_v == 3.6
+    assert loaded.values.max_discharge_current_a == 15
+    assert loaded.values.data_source_url == "https://example.com/cell"
+    assert loaded.values.technical_data == {
+        "Document ID": "TEST-30Q",
+        "Rated Ah": "3",
+    }
+
+
 def test_battery_cannot_be_assigned_to_two_slots(tmp_path) -> None:
     store = BatteryStore(tmp_path / "mc3000.db")
     stored = store.save(

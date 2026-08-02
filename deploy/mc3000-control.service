@@ -1,5 +1,5 @@
 [Unit]
-Description=MC3000 Control
+Description=Open MC3000 Control (OMC)
 After=bluetooth.service network-online.target
 Wants=network-online.target
 Requires=bluetooth.service

@@ -21,6 +21,7 @@ async def test_health_and_interface_expose_version_fixes(tmp_path) -> None:
             interface = await client.get("/")
             login = await client.get("/login")
             script = await client.get("/static/app.js")
+            manifest = await client.get("/manifest.webmanifest")
             removed_workshop = await client.get("/api/workshop")
 
     assert health.status_code == 200
@@ -31,8 +32,14 @@ async def test_health_and_interface_expose_version_fixes(tmp_path) -> None:
     assert 'id="appFixes"' in interface.text
     assert 'id="settingsPhaseOpacity"' in interface.text
     assert 'id="settingsTheme"' in interface.text
-    assert '/static/theme-init.js?v=100' in interface.text
-    assert '/static/theme-init.js?v=100' in login.text
+    assert "Open MC3000 Control" in interface.text
+    assert "Open MC3000 Control" in login.text
+    assert '/static/theme-init.js?v=102' in interface.text
+    assert '/static/theme-init.js?v=102' in login.text
+    assert manifest.json()["name"] == "Open MC3000 Control"
+    assert manifest.json()["short_name"] == "OMC"
+    assert 'id="cellCatalogDialog"' in interface.text
+    assert 'id="cellCatalogSearch"' in interface.text
     assert "workshopView" not in interface.text
     assert "loadWorkshop" not in script.text
     assert removed_workshop.status_code == 404
@@ -53,6 +60,8 @@ async def test_health_and_interface_expose_version_fixes(tmp_path) -> None:
     assert "drawSparklinePhaseBands" in script.text
     assert "chartPalette()" in script.text
     assert "applyTheme(settings.theme)" in script.text
+    assert "useCellCatalogEntry" in script.text
+    assert "technical_data: appState.batteryTechnicalData" in script.text
     assert "Lüfterregelung ${fanModeLabel(device.basic.fan_mode)}" in script.text
     assert '0: "Automatik"' in script.text
     assert "Max. Slottemperatur" not in script.text

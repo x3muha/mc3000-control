@@ -74,7 +74,7 @@ die Bytes 0-19 und nach weiteren 50 ms die Bytes 20-39. Diese drei Schreibvorgä
 ohne GATT-Schreibbestätigung erfolgen. Das Ladegerät quittiert das Profil anschließend mit
 dem Befehl `0x11`.
 
-MC3000 Control sendet nach dieser Quittung absichtlich keinen Start-Befehl. Das Profil ist
+Open MC3000 Control sendet nach dieser Quittung absichtlich keinen Start-Befehl. Das Profil ist
 damit eingestellt, der Start bleibt aber eine getrennte Bedienhandlung.
 
 ## Slotstatus

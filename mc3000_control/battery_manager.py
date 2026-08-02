@@ -3,9 +3,10 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date
 from typing import Any
+from urllib.parse import urlsplit
 
 from .profiles import (
     CHARGE_CURRENT_MAX_MA,
@@ -159,6 +160,21 @@ class BatteryValues:
     origin: str = ""
     in_service_since: str = ""
     protected: bool = False
+    chemistry_detail: str = ""
+    weight_g: float | None = None
+    nominal_voltage_v: float | None = None
+    min_voltage_v: float | None = None
+    max_voltage_v: float | None = None
+    max_charge_current_a: float | None = None
+    max_discharge_current_a: float | None = None
+    cycle_life: int | None = None
+    manufacture_year: int | None = None
+    dimensions: str = ""
+    data_source_name: str = ""
+    data_source_url: str = ""
+    data_source_retrieved_at: str = ""
+    technical_notes: str = ""
+    technical_data: dict[str, str] = field(default_factory=dict)
     standard_mode_code: int = 0
     standard_charge_c_rate: float = 0.5
     standard_discharge_c_rate: float = 0.5
@@ -203,6 +219,12 @@ def validate_battery(values: BatteryValues) -> BatteryValues:
     form_factor = values.form_factor.strip()
     origin = values.origin.strip()
     in_service_since = values.in_service_since.strip()
+    chemistry_detail = values.chemistry_detail.strip()
+    dimensions = values.dimensions.strip()
+    data_source_name = values.data_source_name.strip()
+    data_source_url = values.data_source_url.strip()
+    data_source_retrieved_at = values.data_source_retrieved_at.strip()
+    technical_notes = values.technical_notes.strip()
     if len(name) > 80:
         raise BatteryError("Batteriename darf höchstens 80 Zeichen lang sein")
     if len(manufacturer) > 80:
@@ -213,6 +235,22 @@ def validate_battery(values: BatteryValues) -> BatteryValues:
         raise BatteryError("Bauform darf höchstens 40 Zeichen lang sein")
     if len(origin) > 120:
         raise BatteryError("Herkunft darf höchstens 120 Zeichen lang sein")
+    if len(chemistry_detail) > 80:
+        raise BatteryError("Chemiedetail darf höchstens 80 Zeichen lang sein")
+    if len(dimensions) > 120:
+        raise BatteryError("Abmessungen dürfen höchstens 120 Zeichen lang sein")
+    if len(data_source_name) > 120:
+        raise BatteryError("Datenquelle darf höchstens 120 Zeichen lang sein")
+    if len(data_source_url) > 1000:
+        raise BatteryError("Quellenlink darf höchstens 1000 Zeichen lang sein")
+    if data_source_url and urlsplit(data_source_url).scheme not in {"http", "https"}:
+        raise BatteryError("Quellenlink muss mit http:// oder https:// beginnen")
+    if len(data_source_retrieved_at) > 40:
+        raise BatteryError("Abrufzeit der Datenquelle ist ungültig")
+    if len(technical_notes) > 4000:
+        raise BatteryError(
+            "Technische Zusatzangaben dürfen höchstens 4000 Zeichen lang sein"
+        )
     if in_service_since:
         try:
             date.fromisoformat(in_service_since)
@@ -226,6 +264,69 @@ def validate_battery(values: BatteryValues) -> BatteryValues:
         raise BatteryError("Nennkapazität muss zwischen 100 und 50000 mAh liegen")
     if len(notes) > 1000:
         raise BatteryError("Notizen dürfen höchstens 1000 Zeichen lang sein")
+    weight_g = _optional_number(
+        values.weight_g,
+        "Gewicht",
+        minimum=0.01,
+        maximum=100000,
+    )
+    nominal_voltage_v = _optional_number(
+        values.nominal_voltage_v,
+        "Nennspannung",
+        minimum=0.01,
+        maximum=20,
+    )
+    min_voltage_v = _optional_number(
+        values.min_voltage_v,
+        "Minimale Spannung",
+        minimum=0,
+        maximum=20,
+    )
+    max_voltage_v = _optional_number(
+        values.max_voltage_v,
+        "Maximale Spannung",
+        minimum=0.01,
+        maximum=20,
+    )
+    max_charge_current_a = _optional_number(
+        values.max_charge_current_a,
+        "Maximaler Ladestrom",
+        minimum=0,
+        maximum=1000,
+    )
+    max_discharge_current_a = _optional_number(
+        values.max_discharge_current_a,
+        "Maximaler Entladestrom",
+        minimum=0,
+        maximum=1000,
+    )
+    cycle_life = _optional_integer(
+        values.cycle_life,
+        "Zyklenlebensdauer",
+        minimum=1,
+        maximum=1_000_000,
+    )
+    manufacture_year = _optional_integer(
+        values.manufacture_year,
+        "Herstellungsjahr",
+        minimum=1900,
+        maximum=2100,
+    )
+    if len(values.technical_data) > 100:
+        raise BatteryError("Es sind höchstens 100 technische Datenfelder erlaubt")
+    technical_data: dict[str, str] = {}
+    for raw_key, raw_value in values.technical_data.items():
+        key = str(raw_key).strip()
+        value = str(raw_value).strip()
+        if not key or not value:
+            continue
+        if len(key) > 120:
+            raise BatteryError(
+                "Bezeichnung eines technischen Datenfelds ist zu lang"
+            )
+        if len(value) > 2000:
+            raise BatteryError("Wert eines technischen Datenfelds ist zu lang")
+        technical_data[key] = value
     _validate_standard_settings(
         mode_code=values.standard_mode_code,
         charge_c_rate=values.standard_charge_c_rate,
@@ -249,6 +350,21 @@ def validate_battery(values: BatteryValues) -> BatteryValues:
         origin=origin,
         in_service_since=in_service_since,
         protected=bool(values.protected),
+        chemistry_detail=chemistry_detail,
+        weight_g=weight_g,
+        nominal_voltage_v=nominal_voltage_v,
+        min_voltage_v=min_voltage_v,
+        max_voltage_v=max_voltage_v,
+        max_charge_current_a=max_charge_current_a,
+        max_discharge_current_a=max_discharge_current_a,
+        cycle_life=cycle_life,
+        manufacture_year=manufacture_year,
+        dimensions=dimensions,
+        data_source_name=data_source_name,
+        data_source_url=data_source_url,
+        data_source_retrieved_at=data_source_retrieved_at,
+        technical_notes=technical_notes,
+        technical_data=technical_data,
         standard_mode_code=values.standard_mode_code,
         standard_charge_c_rate=values.standard_charge_c_rate,
         standard_discharge_c_rate=values.standard_discharge_c_rate,
@@ -258,6 +374,40 @@ def validate_battery(values: BatteryValues) -> BatteryValues:
         standard_time_limit_min=values.standard_time_limit_min,
         archived=bool(values.archived),
     )
+
+
+def _optional_number(
+    value: float | None,
+    label: str,
+    *,
+    minimum: float,
+    maximum: float,
+) -> float | None:
+    if value is None:
+        return None
+    number = float(value)
+    if not math.isfinite(number) or not minimum <= number <= maximum:
+        raise BatteryError(
+            f"{label} muss zwischen {minimum:g} und {maximum:g} liegen"
+        )
+    return number
+
+
+def _optional_integer(
+    value: int | None,
+    label: str,
+    *,
+    minimum: int,
+    maximum: int,
+) -> int | None:
+    if value is None:
+        return None
+    number = int(value)
+    if not minimum <= number <= maximum:
+        raise BatteryError(
+            f"{label} muss zwischen {minimum} und {maximum} liegen"
+        )
+    return number
 
 
 def build_standard_profile(

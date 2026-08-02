@@ -36,7 +36,7 @@ supported_python() {
 
 check "Bluetooth-Dienst aktiv" systemctl is-active --quiet bluetooth
 check "Bluetooth-Controller erkannt" bluetooth_controller_present
-check "MC3000-Control-Dienst aktiv" systemctl is-active --quiet mc3000-control
+check "Open-MC3000-Control-Dienst aktiv" systemctl is-active --quiet mc3000-control
 check "HTTP-Zustandsabfrage" curl --fail --silent "http://127.0.0.1:${SERVICE_PORT}/api/health"
 check "Datenordner vorhanden" test -d /var/lib/mc3000-control
 check "Dienstbenutzer in Bluetooth-Gruppe" in_bluetooth_group

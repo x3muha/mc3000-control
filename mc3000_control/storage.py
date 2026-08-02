@@ -894,13 +894,19 @@ class BatteryStore(SQLiteStore):
                         code, name, battery_type_code, nominal_capacity_mah,
                         notes, manufacturer, model, form_factor, origin,
                         in_service_since, protected,
+                        chemistry_detail, weight_g, nominal_voltage_v,
+                        min_voltage_v, max_voltage_v, max_charge_current_a,
+                        max_discharge_current_a, cycle_life, manufacture_year,
+                        dimensions, data_source_name, data_source_url,
+                        data_source_retrieved_at, technical_notes,
+                        technical_data_json,
                         standard_mode_code, standard_charge_c_rate,
                         standard_discharge_c_rate, standard_cycle_count,
                         standard_cycle_mode, standard_time_limit_mode,
                         standard_time_limit_min, archived, archived_at,
                         created_at, updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         values.code,
@@ -914,6 +920,25 @@ class BatteryStore(SQLiteStore):
                         values.origin,
                         values.in_service_since,
                         int(values.protected),
+                        values.chemistry_detail,
+                        values.weight_g,
+                        values.nominal_voltage_v,
+                        values.min_voltage_v,
+                        values.max_voltage_v,
+                        values.max_charge_current_a,
+                        values.max_discharge_current_a,
+                        values.cycle_life,
+                        values.manufacture_year,
+                        values.dimensions,
+                        values.data_source_name,
+                        values.data_source_url,
+                        values.data_source_retrieved_at,
+                        values.technical_notes,
+                        json.dumps(
+                            values.technical_data,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        ),
                         values.standard_mode_code,
                         values.standard_charge_c_rate,
                         values.standard_discharge_c_rate,
@@ -954,6 +979,25 @@ class BatteryStore(SQLiteStore):
             clean.origin,
             clean.in_service_since,
             int(clean.protected),
+            clean.chemistry_detail,
+            clean.weight_g,
+            clean.nominal_voltage_v,
+            clean.min_voltage_v,
+            clean.max_voltage_v,
+            clean.max_charge_current_a,
+            clean.max_discharge_current_a,
+            clean.cycle_life,
+            clean.manufacture_year,
+            clean.dimensions,
+            clean.data_source_name,
+            clean.data_source_url,
+            clean.data_source_retrieved_at,
+            clean.technical_notes,
+            json.dumps(
+                clean.technical_data,
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
             clean.standard_mode_code,
             clean.standard_charge_c_rate,
             clean.standard_discharge_c_rate,
@@ -972,13 +1016,19 @@ class BatteryStore(SQLiteStore):
                             code, name, battery_type_code, nominal_capacity_mah,
                             notes, manufacturer, model, form_factor, origin,
                             in_service_since, protected,
+                            chemistry_detail, weight_g, nominal_voltage_v,
+                            min_voltage_v, max_voltage_v, max_charge_current_a,
+                            max_discharge_current_a, cycle_life, manufacture_year,
+                            dimensions, data_source_name, data_source_url,
+                            data_source_retrieved_at, technical_notes,
+                            technical_data_json,
                             standard_mode_code, standard_charge_c_rate,
                             standard_discharge_c_rate, standard_cycle_count,
                             standard_cycle_mode, standard_time_limit_mode,
                             standard_time_limit_min, archived, archived_at,
                             created_at, updated_at
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (*data, now if clean.archived else "", now, now),
                     )
@@ -991,6 +1041,14 @@ class BatteryStore(SQLiteStore):
                             nominal_capacity_mah = ?, notes = ?,
                             manufacturer = ?, model = ?, form_factor = ?,
                             origin = ?, in_service_since = ?, protected = ?,
+                            chemistry_detail = ?, weight_g = ?,
+                            nominal_voltage_v = ?, min_voltage_v = ?,
+                            max_voltage_v = ?, max_charge_current_a = ?,
+                            max_discharge_current_a = ?, cycle_life = ?,
+                            manufacture_year = ?, dimensions = ?,
+                            data_source_name = ?, data_source_url = ?,
+                            data_source_retrieved_at = ?, technical_notes = ?,
+                            technical_data_json = ?,
                             standard_mode_code = ?, standard_charge_c_rate = ?,
                             standard_discharge_c_rate = ?,
                             standard_cycle_count = ?, standard_cycle_mode = ?,
@@ -2091,6 +2149,20 @@ def _automatic_profile_from_row(row: sqlite3.Row) -> StoredAutomaticProfile:
     )
 
 
+def _json_string_dict(value: Any) -> dict[str, str]:
+    try:
+        parsed = json.loads(str(value or "{}"))
+    except (TypeError, ValueError):
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    return {
+        str(key): str(item)
+        for key, item in parsed.items()
+        if str(key).strip() and str(item).strip()
+    }
+
+
 def _battery_from_row(row: sqlite3.Row) -> StoredBattery:
     return StoredBattery(
         id=int(row["id"]),
@@ -2106,6 +2178,47 @@ def _battery_from_row(row: sqlite3.Row) -> StoredBattery:
             origin=str(row["origin"]),
             in_service_since=str(row["in_service_since"]),
             protected=bool(row["protected"]),
+            chemistry_detail=str(row["chemistry_detail"]),
+            weight_g=(float(row["weight_g"]) if row["weight_g"] is not None else None),
+            nominal_voltage_v=(
+                float(row["nominal_voltage_v"])
+                if row["nominal_voltage_v"] is not None
+                else None
+            ),
+            min_voltage_v=(
+                float(row["min_voltage_v"])
+                if row["min_voltage_v"] is not None
+                else None
+            ),
+            max_voltage_v=(
+                float(row["max_voltage_v"])
+                if row["max_voltage_v"] is not None
+                else None
+            ),
+            max_charge_current_a=(
+                float(row["max_charge_current_a"])
+                if row["max_charge_current_a"] is not None
+                else None
+            ),
+            max_discharge_current_a=(
+                float(row["max_discharge_current_a"])
+                if row["max_discharge_current_a"] is not None
+                else None
+            ),
+            cycle_life=(
+                int(row["cycle_life"]) if row["cycle_life"] is not None else None
+            ),
+            manufacture_year=(
+                int(row["manufacture_year"])
+                if row["manufacture_year"] is not None
+                else None
+            ),
+            dimensions=str(row["dimensions"]),
+            data_source_name=str(row["data_source_name"]),
+            data_source_url=str(row["data_source_url"]),
+            data_source_retrieved_at=str(row["data_source_retrieved_at"]),
+            technical_notes=str(row["technical_notes"]),
+            technical_data=_json_string_dict(row["technical_data_json"]),
             standard_mode_code=int(row["standard_mode_code"]),
             standard_charge_c_rate=float(row["standard_charge_c_rate"]),
             standard_discharge_c_rate=float(row["standard_discharge_c_rate"]),
@@ -2418,6 +2531,21 @@ def _ensure_battery_tables(connection: sqlite3.Connection) -> None:
             origin TEXT NOT NULL DEFAULT '',
             in_service_since TEXT NOT NULL DEFAULT '',
             protected INTEGER NOT NULL DEFAULT 0,
+            chemistry_detail TEXT NOT NULL DEFAULT '',
+            weight_g REAL,
+            nominal_voltage_v REAL,
+            min_voltage_v REAL,
+            max_voltage_v REAL,
+            max_charge_current_a REAL,
+            max_discharge_current_a REAL,
+            cycle_life INTEGER,
+            manufacture_year INTEGER,
+            dimensions TEXT NOT NULL DEFAULT '',
+            data_source_name TEXT NOT NULL DEFAULT '',
+            data_source_url TEXT NOT NULL DEFAULT '',
+            data_source_retrieved_at TEXT NOT NULL DEFAULT '',
+            technical_notes TEXT NOT NULL DEFAULT '',
+            technical_data_json TEXT NOT NULL DEFAULT '{}',
             standard_mode_code INTEGER NOT NULL DEFAULT 0,
             standard_charge_c_rate REAL NOT NULL DEFAULT 0.5,
             standard_discharge_c_rate REAL NOT NULL DEFAULT 0.5,
@@ -2462,6 +2590,24 @@ def _ensure_battery_tables(connection: sqlite3.Connection) -> None:
         "batteries",
         "protected INTEGER NOT NULL DEFAULT 0",
     )
+    for definition in (
+        "chemistry_detail TEXT NOT NULL DEFAULT ''",
+        "weight_g REAL",
+        "nominal_voltage_v REAL",
+        "min_voltage_v REAL",
+        "max_voltage_v REAL",
+        "max_charge_current_a REAL",
+        "max_discharge_current_a REAL",
+        "cycle_life INTEGER",
+        "manufacture_year INTEGER",
+        "dimensions TEXT NOT NULL DEFAULT ''",
+        "data_source_name TEXT NOT NULL DEFAULT ''",
+        "data_source_url TEXT NOT NULL DEFAULT ''",
+        "data_source_retrieved_at TEXT NOT NULL DEFAULT ''",
+        "technical_notes TEXT NOT NULL DEFAULT ''",
+        "technical_data_json TEXT NOT NULL DEFAULT '{}'",
+    ):
+        _add_column_if_missing(connection, "batteries", definition)
     _add_column_if_missing(
         connection,
         "batteries",

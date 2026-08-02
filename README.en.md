@@ -1,8 +1,8 @@
-# MC3000 Control
+# Open MC3000 Control (OMC)
 
 [Deutsche Dokumentation](README.md) · Demo after installation: `/?demo=1`
 
-MC3000 Control is a local, responsive web application for one or more SkyRC MC3000
+Open MC3000 Control (OMC) is a local, responsive web application for one or more SkyRC MC3000
 chargers. A Linux computer maintains the Bluetooth Low Energy connections, records
 measurements and provides charger control, profiles, battery records and reports to
 browsers on the local network. Browsers do not need Bluetooth access.
@@ -21,16 +21,20 @@ More views: [dark dashboard](docs/images/dashboard-dark.png) ·
 - Voltage, current, capacity, temperature, resistance and elapsed time
 - Safe per-slot and all-slot start/stop controls with automatic BLE reconnection
 - Charging profiles, categories, capacity-based programs and portable JSON exchange
-- Battery records, reusable identifiers, QR labels, PDF sheets and permanent deletion
+- Battery records with weight, voltage range, current limits, dimensions, source links,
+  reusable identifiers, QR labels, PDF sheets and permanent deletion
+- Explicitly manual local cell-catalog imports from BetterBat/Zenodo, Second Life
+  Storage and Lygte, followed by local model search and deliberate field transfer
 - Program history, phase-aware charts, capacity/SOH reports, PDF and CSV exports
 - Cell grouping by tested capacity and internal resistance
 - SQLite storage, ZIP backup/restore and anonymized diagnostics
+- No automatic catalog synchronization or background requests to external sources
 - Optional login with scrypt password hashing and login rate limiting
 - German/English UI, light/dark themes and responsive desktop/mobile layouts
 - Installable progressive web app whose API and charger responses are never cached
 - Read-only sample mode at `/?demo=1`; it never accesses Bluetooth or write APIs
 
-Browsers require a secure context for PWA installation. Serve MC3000 Control through
+Browsers require a secure context for PWA installation. Serve Open MC3000 Control through
 HTTPS or open it as `localhost`; normal use on a trusted LAN continues to work over HTTP.
 
 ## Raspberry Pi installation
@@ -74,6 +78,19 @@ Python environment, starts the service and checks its health. Open
 See [INSTALL_RASPBERRY_PI.en.md](INSTALL_RASPBERRY_PI.en.md) for the complete process or
 [INSTALL_LINUX.en.md](INSTALL_LINUX.en.md) for other Linux hosts.
 
+## Manual cell catalog
+
+`Cell catalog` in the battery manager lists the three fixed sources. Only pressing
+`Import selected sources` downloads their current public data into the local SQLite
+database. Imports never run automatically or in the background, and a failed source
+refresh keeps its last successful local snapshot.
+
+When creating or editing a battery, search the local catalog for terms such as
+`Samsung INR` and deliberately apply one result. This copies record and documentation
+fields only. It does not set protection, a default program, a charging profile or a
+program start. The source URL and all imported source fields remain attached to the
+battery record.
+
 ## Compatibility
 
 MC3000 hardware 2.2 with firmware 1.25 is verified with real chargers. Python 3.11,
@@ -83,7 +100,7 @@ supported by the installer; BlueZ 5.55 or newer is required. See the full
 
 The charger is accessed only over BLE. Direct USB and Bluetooth SPP connections are not
 supported. One BLE client can use a charger at a time, so disconnect the official app
-while MC3000 Control is connected.
+while Open MC3000 Control is connected.
 
 ## Development
 
@@ -106,6 +123,9 @@ Always verify chemistry, capacity, currents, voltage limits, temperature limit a
 physical cell assignment before starting a program. Reports do not replace a qualified
 safety inspection of cells or battery packs. Do not expose the HTTP service directly to
 the internet; use HTTPS or a trusted VPN when crossing an untrusted network.
+Catalog data may be incomplete, outdated or contradictory. Verify the cell marking,
+manufacturer datasheet, chemistry, voltage limits and permitted currents before use;
+imported limits are never transferred to a charger automatically.
 
 ## License
 

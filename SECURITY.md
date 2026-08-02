@@ -9,6 +9,6 @@ The current major release receives security fixes. Reports should include the af
 version, impact, reproducible steps and an anonymized diagnostics bundle where useful.
 Please allow reasonable time for investigation before public disclosure.
 
-MC3000 Control is intended for a trusted local network. Do not expose its HTTP service
+Open MC3000 Control is intended for a trusted local network. Do not expose its HTTP service
 directly to the internet. Use the built-in login together with HTTPS or a trusted VPN
 when traffic crosses an untrusted network.

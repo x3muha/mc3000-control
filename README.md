@@ -1,8 +1,8 @@
-# MC3000 Control
+# Open MC3000 Control (OMC)
 
 [English documentation](README.en.md) · Demo nach Installation: `/?demo=1`
 
-MC3000 Control ist eine lokale, responsive Weboberfläche für ein oder mehrere
+Open MC3000 Control (OMC) ist eine lokale, responsive Weboberfläche für ein oder mehrere
 SkyRC-MC3000-Ladegeräte. Ein Linux-Rechner mit Bluetooth LE hält die
 Geräteverbindungen, zeichnet Messwerte auf und stellt Steuerung, Profile,
 Batterieakten und Berichte im lokalen Netzwerk bereit. Der Browser benötigt
@@ -66,8 +66,14 @@ Weitere Ansichten: [Dashboard im Darkmode](docs/images/dashboard-dark.png) ·
 
 - Eindeutige Batterienummern und optionale automatische Nummernvergabe
 - Chemie, Nennkapazität, Name, Hersteller, Modell, Bauform und Herkunft
+- Gewicht, Spannungsbereich, maximale Ströme, Zyklenlebensdauer, Abmessungen und
+  freie technische Zusatzangaben
 - Datum „In Betrieb seit“, Protection-Kennzeichen und freie Notizen
 - Eingabevorschläge aus vorhandenen Batterieakten
+- Ausschließlich manuell ausgelöster Import eines lokalen Zellkatalogs aus
+  BetterBat/Zenodo, Second Life Storage und Lygte
+- Lokale Modell-Suche mit bewusster Übernahme ausgewählter Katalogwerte und
+  dauerhaft gespeichertem Quellenlink
 - Optionaler Betrieb ohne Batterieakte
 - Archiv mit Wiederherstellung
 - Bestätigte endgültige Löschung inklusive Messwerten, Läufen und Berichten
@@ -91,6 +97,7 @@ Weitere Ansichten: [Dashboard im Darkmode](docs/images/dashboard-dark.png) ·
 ### Daten, Betrieb und Zugriff
 
 - Lokale SQLite-Datenbank ohne externen Cloud-Dienst
+- Kein automatischer Katalogabgleich und keine Hintergrundabfragen externer Quellen
 - Konfigurierbare Aufzeichnungs- und Aufbewahrungsintervalle
 - CSV-Export nach Gerät, Slot, Zeitraum oder Batterieakte
 - ZIP-Backup und kontrollierte Wiederherstellung der vollständigen Datenbank
@@ -115,7 +122,7 @@ Weitere Ansichten: [Dashboard im Darkmode](docs/images/dashboard-dark.png) ·
 Das MC3000 wird direkt als BLE-Gerät angesprochen und nicht über die normale
 Bluetooth-Einstellungsseite gekoppelt. Pro Ladegerät kann immer nur ein BLE-Client
 verbunden sein. Die offizielle Smartphone-App muss deshalb getrennt sein, solange
-MC3000 Control das Gerät verwendet.
+Open MC3000 Control das Gerät verwendet.
 
 ## Installation auf einem Raspberry Pi
 
@@ -168,8 +175,21 @@ geöffnet. Sie enthält Lade-, Pausen- und Entladephasen, Batterieakten, Profile
 abgeschlossenen Kapazitätstest. Der Demo-Modus öffnet keine WebSocket- oder
 Bluetooth-Verbindung und sendet keine Schreibbefehle an die API.
 
+## Manueller Zellkatalog
+
+Im Batteriemanager öffnet `Zellkatalog` die drei fest eingebauten Quellen. Erst
+`Ausgewählte Quellen einlesen` lädt deren aktuellen öffentlichen Stand in die lokale
+SQLite-Datenbank. Der Vorgang wird niemals automatisch oder im Hintergrund ausgeführt.
+Bei einem Quellenfehler bleibt der letzte erfolgreich eingelesene Stand erhalten.
+
+Beim Anlegen oder Bearbeiten einer Batterie sucht das Feld `Zellmodell im lokalen
+Katalog` beispielsweise nach `Samsung INR`. Ein ausgewählter Treffer übernimmt nur
+Stammdaten und technische Dokumentationswerte. Protection, Standardprogramm,
+Ladeprofil und Programmstart werden nicht gesetzt. Alle übernommenen Rohfelder sowie
+der Link zum ursprünglichen Datensatz bleiben in der Batterieakte erhalten.
+
 Für die Installation als PWA verlangen aktuelle Browser einen sicheren Kontext. Dafür
-muss MC3000 Control über HTTPS bereitgestellt oder direkt als `localhost` geöffnet
+muss Open MC3000 Control über HTTPS bereitgestellt oder direkt als `localhost` geöffnet
 werden; die normale Bedienung im lokalen Netz funktioniert weiterhin über HTTP.
 
 ## Kompatibilität
@@ -215,6 +235,10 @@ MC3000_PORT=8090 MC3000_DATA_DIR=./data mc3000-control
 Vor jedem Programmstart müssen Akkutyp, Nennkapazität, Strom, Spannungsgrenzen,
 Temperaturlimit und Batteriezuordnung geprüft werden. Die Auswertungen ersetzen
 keine fachgerechte Sicherheitsprüfung einer Zelle oder eines Akkupacks.
+Katalogangaben können unvollständig, veraltet oder widersprüchlich sein. Zellaufdruck,
+Herstellerdatenblatt, Chemie, Spannungen und zulässige Ströme müssen vor jeder Nutzung
+geprüft werden; importierte Grenzwerte werden nicht automatisch an das Ladegerät
+übertragen.
 
 ## Tests
 

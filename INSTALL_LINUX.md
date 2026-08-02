@@ -1,6 +1,6 @@
 # Installation auf einem Linux-Rechner mit Bluetooth LE
 
-MC3000 Control kann außer auf einem Raspberry Pi auch auf einem gewöhnlichen
+Open MC3000 Control kann außer auf einem Raspberry Pi auch auf einem gewöhnlichen
 Linux-PC, Mini-PC, Notebook oder Heimserver laufen. Der Rechner muss während der
 Nutzung eingeschaltet sein, das MC3000 per Bluetooth Low Energy erreichen und aus
 dem gewünschten lokalen Netzwerk erreichbar sein.
@@ -107,7 +107,7 @@ bluetoothctl --version
 
 Ist Python älter als 3.11, muss zuerst eine aktuelle, von der Distribution gepflegte
 Python-Version installiert werden. Die System-Python-Installation darf nicht mit
-`sudo pip` verändert werden; MC3000 Control verwendet eine eigene virtuelle Umgebung.
+`sudo pip` verändert werden; Open MC3000 Control verwendet eine eigene virtuelle Umgebung.
 
 ## 4. BlueZ starten und Controller aktivieren
 
@@ -160,10 +160,10 @@ bluetoothctl --timeout 15 scan on
 Je nach Firmware erscheint das MC3000 beispielsweise als `Charger`,
 `SimpleBLEPeripheral` oder `HitecCharger`.
 
-Das MC3000 nicht mit `bluetoothctl pair`, `trust` oder `connect` koppeln. MC3000 Control
+Das MC3000 nicht mit `bluetoothctl pair`, `trust` oder `connect` koppeln. Open MC3000 Control
 öffnet die benötigte BLE-GATT-Verbindung selbst.
 
-## 6. MC3000 Control installieren
+## 6. Open MC3000 Control installieren
 
 Das aktuelle Release-Archiv entpacken, in den Ordner wechseln und `./install.sh`
 ausführen. Auf Debian-, Ubuntu- und Mint-Systemen installiert das Skript alle benötigten
@@ -213,7 +213,7 @@ Auf dem Installationsrechner selbst funktioniert auch:
 http://127.0.0.1:8083/
 ```
 
-MC3000 Control lauscht standardmäßig auf allen Netzwerkschnittstellen. Die Oberfläche
+Open MC3000 Control lauscht standardmäßig auf allen Netzwerkschnittstellen. Die Oberfläche
 sollte nicht ungefiltert aus dem Internet erreichbar gemacht werden. Unter
 `Einstellungen` kann ein Login aktiviert werden.
 
@@ -298,7 +298,7 @@ Maschine.
 - Smartphone-App vollständig schließen.
 - Abstand verkleinern.
 - Sicherstellen, dass nicht bereits ein anderer Rechner verbunden ist.
-- BlueZ und MC3000 Control neu starten.
+- BlueZ und Open MC3000 Control neu starten.
 
 ```bash
 sudo systemctl restart bluetooth.service

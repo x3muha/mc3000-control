@@ -48,6 +48,11 @@ from .battery_manager import (
     build_standard_profile,
 )
 from .ble import DeviceManager, DeviceSession
+from .cell_catalog import (
+    CATALOG_SOURCES,
+    CellCatalogStore,
+    import_catalog_sources,
+)
 from .diagnostics import create_diagnostics, install_log_collector
 from .pack_builder import PackBuilderError, build_cell_groups
 from .profile_exchange import (
@@ -163,6 +168,21 @@ class BatteryRequest(BaseModel):
     origin: str = Field(default="", max_length=120)
     in_service_since: str = Field(default="", max_length=10)
     protected: bool = False
+    chemistry_detail: str = Field(default="", max_length=80)
+    weight_g: float | None = None
+    nominal_voltage_v: float | None = None
+    min_voltage_v: float | None = None
+    max_voltage_v: float | None = None
+    max_charge_current_a: float | None = None
+    max_discharge_current_a: float | None = None
+    cycle_life: int | None = None
+    manufacture_year: int | None = None
+    dimensions: str = Field(default="", max_length=120)
+    data_source_name: str = Field(default="", max_length=120)
+    data_source_url: str = Field(default="", max_length=1000)
+    data_source_retrieved_at: str = Field(default="", max_length=40)
+    technical_notes: str = Field(default="", max_length=4000)
+    technical_data: dict[str, str] = Field(default_factory=dict)
     archived: bool = False
 
     def to_values(self, standard: BatteryValues | None = None) -> BatteryValues:
@@ -184,6 +204,10 @@ class BatteryRequest(BaseModel):
 class NumberedBatteryRequest(BaseModel):
     battery_type_code: int
     nominal_capacity_mah: int = Field(ge=100, le=50000)
+
+
+class CellCatalogImportRequest(BaseModel):
+    sources: list[str] = Field(min_length=1, max_length=len(CATALOG_SOURCES))
 
 
 class PermanentBatteryDeleteRequest(BaseModel):
@@ -303,6 +327,7 @@ def create_app(
         registry = DeviceRegistry(database_path)
         profile_store = ProfileStore(database_path)
         battery_store = BatteryStore(database_path)
+        cell_catalog_store = CellCatalogStore(database_path)
         measurement_store = MeasurementStore(database_path)
 
         async def purge_expired_measurements() -> None:
@@ -339,6 +364,7 @@ def create_app(
         app.state.manager = manager
         app.state.profiles = profile_store
         app.state.batteries = battery_store
+        app.state.cell_catalog = cell_catalog_store
         app.state.measurements = measurement_store
         app.state.database_path = database_path
         app.state.data_dir = resolved_data_dir
@@ -358,7 +384,7 @@ def create_app(
             await manager.stop()
 
     app = FastAPI(
-        title="MC3000 Control",
+        title="Open MC3000 Control",
         version=__version__,
         lifespan=lifespan,
         docs_url=None,
@@ -1040,6 +1066,40 @@ def create_app(
         return battery_options_payload(
             [profile.to_dict() for profile in automatic_profiles]
         )
+
+    @app.get("/api/cell-catalog/sources")
+    async def cell_catalog_sources() -> dict:
+        sources = await asyncio.to_thread(app.state.cell_catalog.source_statuses)
+        return {
+            "sources": sources,
+            "total_entries": sum(source["entry_count"] for source in sources),
+        }
+
+    @app.post("/api/cell-catalog/import")
+    async def import_cell_catalog(request: CellCatalogImportRequest) -> dict:
+        try:
+            return await asyncio.to_thread(
+                import_catalog_sources,
+                app.state.cell_catalog,
+                request.sources,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/cell-catalog/search")
+    async def search_cell_catalog(
+        q: str = Query(min_length=2, max_length=100),
+        limit: int = Query(default=20, ge=1, le=50),
+    ) -> dict:
+        entries = await asyncio.to_thread(
+            app.state.cell_catalog.search,
+            q,
+            limit=limit,
+        )
+        return {
+            "entries": [entry.to_dict() for entry in entries],
+            "query": q,
+        }
 
     @app.get("/api/batteries")
     async def batteries(
@@ -2461,8 +2521,8 @@ def _login_page() -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Anmelden · MC3000 Control</title>
-  <script src="/static/theme-init.js?v=100"></script>
+  <title>Anmelden · Open MC3000 Control</title>
+  <script src="/static/theme-init.js?v=102"></script>
   <style>
     :root { color-scheme:light; font-family:Inter, system-ui, sans-serif; --page:#f2f4f5; --surface:#fff; --ink:#202427; --muted:#667078; --line:#cfd6d9; --input:#fff; --button:#16825d; --button-ink:#fff; --error:#b52b34; }
     :root[data-theme="dark"] { color-scheme:dark; --page:#10171a; --surface:#182125; --ink:#e8eef0; --muted:#a8b4ba; --line:#344249; --input:#11191d; --button:#4fc59a; --button-ink:#07110d; --error:#ff8991; }
@@ -2478,7 +2538,7 @@ def _login_page() -> str:
 </head>
 <body>
   <main>
-    <h1>MC3000 Control</h1>
+    <h1>Open MC3000 Control</h1>
     <p>Diese Oberfläche ist geschützt. Bitte anmelden.</p>
     <form id="login">
       <label>Benutzername<input id="username" autocomplete="username" required autofocus></label>
@@ -2487,8 +2547,8 @@ def _login_page() -> str:
       <p id="error" role="alert"></p>
     </form>
   </main>
-  <script src="/static/i18n.js?v=100"></script>
-  <script src="/static/login.js?v=100"></script>
+  <script src="/static/i18n.js?v=102"></script>
+  <script src="/static/login.js?v=102"></script>
 </body>
 </html>"""
 
@@ -2562,7 +2622,35 @@ async def _apply_profile_groups(
     for profile, slots in groups.values():
         slot_mask = sum(1 << (slot - 1) for slot in slots)
         packet = build_profile_packet(profile, slot_mask)
-        results.append(await session.apply_profile(packet, slots))
+        try:
+            results.append(await session.apply_profile(packet, slots))
+            continue
+        except TimeoutError:
+            LOGGER.warning(
+                "%s: profile acknowledgement timed out for slots %s",
+                session.address,
+                ",".join(str(slot) for slot in slots),
+            )
+
+        # Repeating a profile transfer is safe: applying a profile does not start
+        # a program. Some MC3000 connections occasionally omit the acknowledgement
+        # for a combined slot mask, although individual slot transfers still work.
+        retry_slots = slots if len(slots) > 1 else [slots[0]]
+        for slot in retry_slots:
+            single_packet = build_profile_packet(profile, 1 << (slot - 1))
+            try:
+                result = await session.apply_profile(single_packet, [slot])
+            except TimeoutError as exc:
+                LOGGER.warning(
+                    "%s: profile acknowledgement timed out for slot %d",
+                    session.address,
+                    slot,
+                )
+                raise RuntimeError(
+                    "Das Ladegerät hat die Profilübertragung für "
+                    f"Slot {slot} nicht bestätigt. Verbindung prüfen und erneut versuchen."
+                ) from exc
+            results.append(result)
     return results
 
 

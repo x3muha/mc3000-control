@@ -1266,10 +1266,175 @@ dialog textarea:focus {
   overflow-y: auto;
 }
 
+.battery-dialog {
+  width: min(960px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+  overflow-y: auto;
+}
+
+.cell-catalog-dialog {
+  width: min(760px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+  overflow-y: auto;
+}
+
+.cell-catalog-sources {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.cell-catalog-source {
+  min-width: 0;
+  display: grid !important;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px !important;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.cell-catalog-source > input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+}
+
+.cell-catalog-source > span,
+.cell-catalog-source strong,
+.cell-catalog-source small {
+  min-width: 0;
+  display: block;
+}
+
+.cell-catalog-source small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.cell-catalog-source .catalog-error {
+  color: var(--red);
+}
+
+.cell-catalog-source a,
+.battery-technical-summary a {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 750;
+}
+
 .profile-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 15px 18px;
+}
+
+.cell-catalog-search {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.cell-catalog-search > div:first-of-type {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.cell-catalog-search > div:first-of-type input {
+  border-radius: 4px 0 0 4px;
+}
+
+.cell-catalog-search > div:first-of-type button {
+  border-left: 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.cell-catalog-results {
+  max-height: 270px;
+  overflow-y: auto;
+}
+
+.cell-catalog-result {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.cell-catalog-result > span,
+.cell-catalog-result strong,
+.cell-catalog-result small {
+  min-width: 0;
+  display: block;
+}
+
+.cell-catalog-result small {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.cell-catalog-result button {
+  flex: 0 0 auto;
+}
+
+.battery-advanced {
+  margin-top: 2px;
+  padding: 13px 0 2px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.battery-advanced > summary,
+.battery-technical-data summary,
+.battery-technical-summary summary {
+  margin-bottom: 14px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.battery-technical-data {
+  min-width: 0;
+}
+
+.battery-technical-data dl,
+.battery-technical-summary dl {
+  max-height: 280px;
+  margin: 0;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+}
+
+.battery-technical-data dl > div,
+.battery-technical-summary dl > div {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.7fr) minmax(0, 1.3fr);
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.battery-technical-data dt,
+.battery-technical-data dd,
+.battery-technical-summary dt,
+.battery-technical-summary dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+
+.battery-technical-data dt,
+.battery-technical-summary dt {
+  color: var(--muted);
+  font-weight: 750;
 }
 
 .profile-form-grid .span-2 {
@@ -1742,6 +1907,45 @@ dialog textarea:focus {
   border-bottom: 1px solid var(--line);
 }
 
+.battery-technical-summary {
+  margin: -10px 0 30px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.battery-technical-summary > p {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.battery-technical-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 12px 18px;
+}
+
+.battery-technical-facts span,
+.battery-technical-facts small,
+.battery-technical-facts strong {
+  min-width: 0;
+  display: block;
+}
+
+.battery-technical-facts small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.battery-technical-facts strong {
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
 .battery-stats > div {
   min-width: 0;
   padding: 16px;
@@ -2191,6 +2395,29 @@ dialog textarea:focus {
 
   .profile-form-grid .span-2 {
     grid-column: auto;
+  }
+
+  .cell-catalog-source {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+
+  .cell-catalog-source > a {
+    grid-column: 2;
+  }
+
+  .cell-catalog-result {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cell-catalog-result button {
+    align-self: flex-start;
+  }
+
+  .battery-technical-data dl > div,
+  .battery-technical-summary dl > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
   }
 
   .slot-picker {

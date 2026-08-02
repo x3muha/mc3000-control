@@ -14,7 +14,7 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 if [[ ! -f "${PROJECT_DIR}/pyproject.toml" ]]; then
-  echo "Das Skript muss aus dem MC3000-Control-Repository gestartet werden." >&2
+  echo "Das Skript muss aus dem Open-MC3000-Control-Repository gestartet werden." >&2
   exit 2
 fi
 

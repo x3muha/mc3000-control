@@ -3,6 +3,17 @@
 All notable changes are documented here. The project uses semantic versioning from
 version 1.0.0 onward.
 
+## Unreleased
+
+- Rename the visible product to Open MC3000 Control, with OMC as its compact and
+  installed-app name, while retaining compatible service, package and data paths.
+- Add a local cell catalog with explicitly manual imports from BetterBat/Zenodo,
+  Second Life Storage and Lygte, per-source status and failure-safe refreshes.
+- Add local model search and deliberate catalog-to-record field transfer without
+  changing charger programs, protection flags or hardware state.
+- Extend battery records and PDF sheets with weight, voltage range, current limits,
+  cycle life, dimensions, technical notes, preserved source fields and source URLs.
+
 ## 1.0.0 - 2026-08-01
 
 - Stable multi-charger BLE control, profiles, battery records, program history, charts,

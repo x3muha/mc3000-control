@@ -43,6 +43,17 @@ def battery_sheet_pdf(
             ),
         ]
     )
+    if battery.get("technical_notes"):
+        story.extend(
+            [
+                Spacer(1, 4 * mm),
+                Paragraph("Technische Zusatzangaben", _styles()["Heading2"]),
+                Paragraph(
+                    _safe_text(battery.get("technical_notes")),
+                    _styles()["BodyText"],
+                ),
+            ]
+        )
     return _build_pdf(story, title=f"Batterie {battery.get('code', '')}")
 
 
@@ -120,7 +131,7 @@ def _build_pdf(story: list[Any], *, title: str) -> bytes:
         topMargin=14 * mm,
         bottomMargin=15 * mm,
         title=title,
-        author="MC3000 Control",
+        author="Open MC3000 Control",
     )
     document.build(story, onFirstPage=_page_footer, onLaterPages=_page_footer)
     return output.getvalue()
@@ -130,7 +141,7 @@ def _page_footer(canvas: Any, document: Any) -> None:
     canvas.saveState()
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(colors.HexColor("#64748b"))
-    canvas.drawString(16 * mm, 8 * mm, "MC3000 Control")
+    canvas.drawString(16 * mm, 8 * mm, "Open MC3000 Control")
     canvas.drawRightString(
         A4[0] - 16 * mm,
         8 * mm,
@@ -183,6 +194,12 @@ def _battery_details_table(battery: dict[str, Any]) -> Table:
         ("Name", battery.get("name") or "–", "Nennkapazität", _unit(battery.get("nominal_capacity_mah"), "mAh")),
         ("Hersteller", battery.get("manufacturer") or "–", "Typ / Modell", battery.get("model") or "–"),
         ("Bauform", battery.get("form_factor") or "–", "Protection", "Ja" if battery.get("protected") else "Nein"),
+        ("Chemiedetail", battery.get("chemistry_detail") or "–", "Gewicht", _unit(battery.get("weight_g"), "g", decimals=2)),
+        ("Nennspannung", _unit(battery.get("nominal_voltage_v"), "V", decimals=3), "Min. / Max. Spannung", f"{_number(battery.get('min_voltage_v'), 3)} / {_number(battery.get('max_voltage_v'), 3)} V"),
+        ("Max. Ladestrom", _unit(battery.get("max_charge_current_a"), "A", decimals=2), "Max. Entladestrom", _unit(battery.get("max_discharge_current_a"), "A", decimals=2)),
+        ("Zyklenlebensdauer", battery.get("cycle_life") or "–", "Herstellungsjahr", battery.get("manufacture_year") or "–"),
+        ("Abmessungen", battery.get("dimensions") or "–", "Datenquelle", battery.get("data_source_name") or "–"),
+        ("Quellenlink", battery.get("data_source_url") or "–", "Quellenabruf", _date_time(battery.get("data_source_retrieved_at"))),
         ("Herkunft", battery.get("origin") or "–", "In Betrieb seit", _date(battery.get("in_service_since"))),
         ("Angelegt", _date_time(battery.get("created_at")), "Aktualisiert", _date_time(battery.get("updated_at"))),
     ]

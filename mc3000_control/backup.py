@@ -74,7 +74,7 @@ def inspect_backup(content: bytes) -> dict[str, Any]:
                 raise BackupError("Datenbank im Backup ist größer als 250 MB")
             manifest = json.loads(archive.read("manifest.json"))
             if manifest.get("format") != "mc3000-control-backup":
-                raise BackupError("Datei ist kein MC3000-Control-Backup")
+                raise BackupError("Datei ist kein Open-MC3000-Control-Backup")
             database = archive.read("mc3000-control.db")
     except (json.JSONDecodeError, zipfile.BadZipFile) as exc:
         raise BackupError("Backup-Datei ist beschädigt") from exc

@@ -1,6 +1,6 @@
 # Installation on another Linux host with BLE
 
-MC3000 Control can run on a desktop, mini PC, notebook or home server. The host must run
+Open MC3000 Control can run on a desktop, mini PC, notebook or home server. The host must run
 Linux with systemd, reach the charger over Bluetooth Low Energy and remain powered while
 the charger is used.
 

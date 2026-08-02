@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#1d5c50">
-  <title>MC3000 Control</title>
-  <script src="/static/theme-init.js?v=100"></script>
+  <title>Open MC3000 Control</title>
+  <script src="/static/theme-init.js?v=102"></script>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/static/style.css?v=100">
+  <link rel="stylesheet" href="/static/style.css?v=102">
 </head>
 <body>
   <div class="demo-banner">Interactive demo · sample data only · charger control is disabled</div>
@@ -17,7 +17,7 @@
     <div class="topbar-inner">
       <div class="brand">
         <p class="eyebrow">LADEGERÄTE</p>
-        <h1>MC3000 Control</h1>
+        <h1><span class="desktop-label">Open MC3000 Control</span><span class="mobile-label">OMC</span></h1>
       </div>
       <nav class="main-tabs" aria-label="Bereiche">
         <button class="tab-button active" data-action="show-view" data-view="devicesView">Ladegeräte</button>
@@ -100,6 +100,7 @@
           <h2>Batteriemanager</h2>
         </div>
         <div class="page-head-actions">
+          <button data-action="open-cell-catalog">Zellkatalog</button>
           <button id="batteryArchiveToggle" data-action="toggle-battery-archive">Archiv öffnen</button>
           <button class="primary" data-action="new-battery">Neue Batterie</button>
         </div>
@@ -172,6 +173,7 @@
             </header>
 
             <div id="batteryStats" class="battery-stats"></div>
+            <div id="batteryTechnicalSummary" class="battery-technical-summary" hidden></div>
 
             <section class="battery-compare-section">
               <div class="section-head">
@@ -791,7 +793,26 @@
     </form>
   </dialog>
 
-  <dialog id="batteryDialog">
+  <dialog id="cellCatalogDialog" class="cell-catalog-dialog">
+    <form method="dialog" id="cellCatalogForm">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">LOKALER ZELLKATALOG</p>
+          <h2>Katalogquellen einlesen</h2>
+        </div>
+        <button type="button" class="icon-button" data-action="close-dialog" data-dialog="cellCatalogDialog" aria-label="Schließen">×</button>
+      </div>
+      <div id="cellCatalogSources" class="cell-catalog-sources"></div>
+      <p id="cellCatalogSummary" class="form-note">Noch kein lokaler Katalog vorhanden.</p>
+      <p class="form-note">Kein automatischer Abgleich. Vorhandene Katalogdaten bleiben bei einem Quellenfehler erhalten.</p>
+      <div class="dialog-actions">
+        <button type="button" data-action="close-dialog" data-dialog="cellCatalogDialog">Abbrechen</button>
+        <button type="submit" class="primary" id="cellCatalogImportButton">Ausgewählte Quellen einlesen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="batteryDialog" class="battery-dialog">
     <form method="dialog" id="batteryForm">
       <div class="dialog-head">
         <div>
@@ -801,7 +822,16 @@
         <button type="button" class="icon-button" data-action="close-dialog" data-dialog="batteryDialog" aria-label="Schließen">×</button>
       </div>
       <input type="hidden" id="batteryId">
+      <input type="hidden" id="batteryDataSourceRetrievedAt">
       <div class="profile-form-grid">
+        <div class="cell-catalog-search span-2">
+          <label for="cellCatalogSearch">Zellmodell im lokalen Katalog</label>
+          <div>
+            <input id="cellCatalogSearch" maxlength="100" autocomplete="off" placeholder="z. B. Samsung INR">
+            <button type="button" data-action="search-cell-catalog">Suchen</button>
+          </div>
+          <div id="cellCatalogResults" class="cell-catalog-results" aria-live="polite"></div>
+        </div>
         <label>Batterienummer
           <input id="batteryCode" maxlength="32" required autocomplete="off" placeholder="001">
         </label>
@@ -833,6 +863,51 @@
           <input id="batteryProtected" type="checkbox">
           <span>Protection vorhanden</span>
         </label>
+        <details class="battery-advanced span-2">
+          <summary>Erweiterte technische Daten</summary>
+          <div class="profile-form-grid">
+            <label>Chemiedetail
+              <input id="batteryChemistryDetail" maxlength="80" autocomplete="off" placeholder="z. B. NMC oder NCA">
+            </label>
+            <label>Gewicht
+              <span class="input-unit"><input id="batteryWeight" type="number" min="0.01" max="100000" step="0.01"><span>g</span></span>
+            </label>
+            <label>Nennspannung
+              <span class="input-unit"><input id="batteryNominalVoltage" type="number" min="0.01" max="20" step="0.001"><span>V</span></span>
+            </label>
+            <label>Minimale Spannung
+              <span class="input-unit"><input id="batteryMinVoltage" type="number" min="0" max="20" step="0.001"><span>V</span></span>
+            </label>
+            <label>Maximale Spannung
+              <span class="input-unit"><input id="batteryMaxVoltage" type="number" min="0.01" max="20" step="0.001"><span>V</span></span>
+            </label>
+            <label>Maximaler Ladestrom
+              <span class="input-unit"><input id="batteryMaxChargeCurrent" type="number" min="0" max="1000" step="0.01"><span>A</span></span>
+            </label>
+            <label>Maximaler Entladestrom
+              <span class="input-unit"><input id="batteryMaxDischargeCurrent" type="number" min="0" max="1000" step="0.01"><span>A</span></span>
+            </label>
+            <label>Zyklenlebensdauer
+              <input id="batteryCycleLife" type="number" min="1" max="1000000" step="1">
+            </label>
+            <label>Herstellungsjahr
+              <input id="batteryManufactureYear" type="number" min="1900" max="2100" step="1">
+            </label>
+            <label>Abmessungen
+              <input id="batteryDimensions" maxlength="120" autocomplete="off" placeholder="z. B. Ø 18,3 × 65 mm">
+            </label>
+            <label>Datenquelle
+              <input id="batteryDataSourceName" maxlength="120" autocomplete="off">
+            </label>
+            <label>Link zum Datensatz
+              <input id="batteryDataSourceUrl" type="url" maxlength="1000" autocomplete="off" placeholder="https://…">
+            </label>
+            <label class="span-2">Technische Zusatzangaben
+              <textarea id="batteryTechnicalNotes" maxlength="4000" rows="4"></textarea>
+            </label>
+            <div id="batteryTechnicalData" class="battery-technical-data span-2"></div>
+          </div>
+        </details>
         <label class="span-2">Notizen
           <textarea id="batteryNotes" maxlength="1000" rows="4"></textarea>
         </label>
@@ -973,8 +1048,8 @@
     </div>
   </dialog>
 
-  <script src="/static/i18n.js?v=100"></script>
-  <script src="/static/demo.js?v=100"></script>
-  <script src="/static/app.js?v=100"></script>
+  <script src="/static/i18n.js?v=102"></script>
+  <script src="/static/demo.js?v=102"></script>
+  <script src="/static/app.js?v=102"></script>
 </body>
 </html>

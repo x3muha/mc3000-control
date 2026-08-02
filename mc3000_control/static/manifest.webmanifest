@@ -1,6 +1,6 @@
 {
-  "name": "MC3000 Control",
-  "short_name": "MC3000",
+  "name": "Open MC3000 Control",
+  "short_name": "OMC",
   "description": "Local Bluetooth LE control and battery records for SkyRC MC3000 chargers.",
   "id": "/",
   "start_url": "/",

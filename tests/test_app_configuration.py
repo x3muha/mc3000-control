@@ -1,9 +1,10 @@
 from dataclasses import replace
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from mc3000_control import protocol
-from mc3000_control.app import create_app
+from mc3000_control.app import _apply_profile_groups, create_app
 from mc3000_control.battery_manager import BatteryValues
 from mc3000_control.ble import DeviceSession
 from mc3000_control.profiles import effective_time_limit_min
@@ -244,6 +245,60 @@ async def test_identical_automatic_program_is_transferred_to_all_slots_once(
             for write in fake.writes
             if len(write) == protocol.FRAME_SIZE and write[0] == 0x0F
         )
+
+
+async def test_group_profile_timeout_falls_back_to_individual_slots(tmp_path) -> None:
+    app = create_app(data_dir=tmp_path, scan_timeout=0.01)
+    async with app.router.lifespan_context(app):
+        session = DeviceSession(
+            RegisteredDevice(ADDRESS, "Test", True, False),
+            app.state.manager.publish,
+            app.state.profiles,
+            app.state.batteries,
+            app.state.measurements,
+        )
+        profile = app.state.profiles.list()[0].values
+        calls: list[list[int]] = []
+
+        async def apply_profile(_packet: bytes, slots: list[int]) -> dict:
+            calls.append(list(slots))
+            if len(slots) > 1:
+                raise TimeoutError
+            return {"ok": True, "slots": slots, "started": False}
+
+        session.apply_profile = apply_profile  # type: ignore[method-assign]
+
+        results = await _apply_profile_groups(
+            session,
+            [(1, profile), (2, profile)],
+        )
+
+        assert calls == [[1, 2], [1], [2]]
+        assert [result["slots"] for result in results] == [[1], [2]]
+
+
+async def test_single_profile_timeout_returns_explanatory_error(tmp_path) -> None:
+    app = create_app(data_dir=tmp_path, scan_timeout=0.01)
+    async with app.router.lifespan_context(app):
+        session = DeviceSession(
+            RegisteredDevice(ADDRESS, "Test", True, False),
+            app.state.manager.publish,
+            app.state.profiles,
+            app.state.batteries,
+            app.state.measurements,
+        )
+        profile = app.state.profiles.list()[0].values
+
+        async def apply_profile(_packet: bytes, _slots: list[int]) -> dict:
+            raise TimeoutError
+
+        session.apply_profile = apply_profile  # type: ignore[method-assign]
+
+        with pytest.raises(
+            RuntimeError,
+            match="Profilübertragung für Slot 1 nicht bestätigt",
+        ):
+            await _apply_profile_groups(session, [(1, profile)])
 
 
 async def test_automatic_slot_program_is_clamped_and_persisted(tmp_path) -> None:

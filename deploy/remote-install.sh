@@ -48,7 +48,7 @@ else
 fi
 
 if ! python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 11))'; then
-  echo "MC3000 Control benoetigt Python 3.11 oder neuer." >&2
+  echo "Open MC3000 Control benoetigt Python 3.11 oder neuer." >&2
   python3 --version >&2
   exit 2
 fi

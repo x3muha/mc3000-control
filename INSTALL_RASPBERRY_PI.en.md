@@ -15,7 +15,7 @@ ssh <USER>@<HOSTNAME>.local
 
 ## 2. Choose an installation source
 
-MC3000 Control can be installed from a fixed release or directly from the current Git
+Open MC3000 Control can be installed from a fixed release or directly from the current Git
 revision. The release is recommended for normal use.
 
 ### Option A: install a stable release (recommended)
@@ -86,7 +86,7 @@ Run `./deploy/check-installation.sh` for a repeatable installation check.
 ## 4. Connect a charger
 
 Enable Bluetooth in the MC3000 global setup and fully disconnect the official phone
-app. Do not pair the charger with `bluetoothctl`; MC3000 Control opens the BLE GATT
+app. Do not pair the charger with `bluetoothctl`; Open MC3000 Control opens the BLE GATT
 connection itself.
 
 Open the connection manager in the web UI, start a scan, add each charger and assign a

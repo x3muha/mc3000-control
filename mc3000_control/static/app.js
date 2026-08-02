@@ -11,6 +11,9 @@ const appState = {
   profileCategory: "all",
   pendingAutomaticProgram: null,
   batteries: [],
+  cellCatalogSources: [],
+  cellCatalogResults: [],
+  batteryTechnicalData: {},
   showArchivedBatteries: false,
   batteryOptions: null,
   selectedBattery: null,
@@ -184,6 +187,7 @@ const elements = {
   batteryDetailTitle: document.getElementById("batteryDetailTitle"),
   batteryDetailMeta: document.getElementById("batteryDetailMeta"),
   batteryStats: document.getElementById("batteryStats"),
+  batteryTechnicalSummary: document.getElementById("batteryTechnicalSummary"),
   batteryRuns: document.getElementById("batteryRuns"),
   batteryCompareMetric: document.getElementById("batteryCompareMetric"),
   batteryCompareLegend: document.getElementById("batteryCompareLegend"),
@@ -210,6 +214,28 @@ const elements = {
   batteryInServiceSince: document.getElementById("batteryInServiceSince"),
   batteryProtected: document.getElementById("batteryProtected"),
   batteryNotes: document.getElementById("batteryNotes"),
+  cellCatalogDialog: document.getElementById("cellCatalogDialog"),
+  cellCatalogForm: document.getElementById("cellCatalogForm"),
+  cellCatalogSources: document.getElementById("cellCatalogSources"),
+  cellCatalogSummary: document.getElementById("cellCatalogSummary"),
+  cellCatalogImportButton: document.getElementById("cellCatalogImportButton"),
+  cellCatalogSearch: document.getElementById("cellCatalogSearch"),
+  cellCatalogResults: document.getElementById("cellCatalogResults"),
+  batteryChemistryDetail: document.getElementById("batteryChemistryDetail"),
+  batteryWeight: document.getElementById("batteryWeight"),
+  batteryNominalVoltage: document.getElementById("batteryNominalVoltage"),
+  batteryMinVoltage: document.getElementById("batteryMinVoltage"),
+  batteryMaxVoltage: document.getElementById("batteryMaxVoltage"),
+  batteryMaxChargeCurrent: document.getElementById("batteryMaxChargeCurrent"),
+  batteryMaxDischargeCurrent: document.getElementById("batteryMaxDischargeCurrent"),
+  batteryCycleLife: document.getElementById("batteryCycleLife"),
+  batteryManufactureYear: document.getElementById("batteryManufactureYear"),
+  batteryDimensions: document.getElementById("batteryDimensions"),
+  batteryDataSourceName: document.getElementById("batteryDataSourceName"),
+  batteryDataSourceUrl: document.getElementById("batteryDataSourceUrl"),
+  batteryDataSourceRetrievedAt: document.getElementById("batteryDataSourceRetrievedAt"),
+  batteryTechnicalNotes: document.getElementById("batteryTechnicalNotes"),
+  batteryTechnicalData: document.getElementById("batteryTechnicalData"),
   standardProgramDialog: document.getElementById("standardProgramDialog"),
   standardProgramForm: document.getElementById("standardProgramForm"),
   standardProgramTitle: document.getElementById("standardProgramTitle"),
@@ -384,7 +410,7 @@ function renderConnectionManager() {
               data-action="remove-device"
               data-address="${escapeHtml(device.address)}"
               ${active ? "disabled" : ""}
-              title="${active ? "Ein laufendes Programm schützt das Ladegerät vor dem Entfernen" : "Ladegerät aus MC3000 Control entfernen"}"
+              title="${active ? "Ein laufendes Programm schützt das Ladegerät vor dem Entfernen" : "Ladegerät aus Open MC3000 Control entfernen"}"
             >Entfernen</button>
           </div>
         </article>
@@ -689,7 +715,7 @@ document.addEventListener("click", async (event) => {
       const device = findDevice(address);
       const confirmed = window.confirm(
         `${device?.alias || "Dieses Ladegerät"} wirklich entfernen?\n\n`
-        + "Nur dieses Ladegerät wird getrennt und aus MC3000 Control entfernt. "
+        + "Nur dieses Ladegerät wird getrennt und aus Open MC3000 Control entfernt. "
         + "Batterieakten und Messdaten bleiben erhalten.",
       );
       if (!confirmed) return;
@@ -815,6 +841,13 @@ document.addEventListener("click", async (event) => {
       await deleteProfile(Number(button.dataset.profileId));
     } else if (action === "new-battery") {
       openBatteryDialog();
+    } else if (action === "open-cell-catalog") {
+      await loadCellCatalogSources();
+      elements.cellCatalogDialog.showModal();
+    } else if (action === "search-cell-catalog") {
+      await searchCellCatalog();
+    } else if (action === "use-cell-catalog-entry") {
+      useCellCatalogEntry(Number(button.dataset.catalogEntryId));
     } else if (action === "toggle-battery-archive") {
       appState.showArchivedBatteries = !appState.showArchivedBatteries;
       appState.selectedBattery = null;
@@ -1267,6 +1300,21 @@ elements.batteryForm.addEventListener("submit", async (event) => {
           origin: elements.batteryOrigin.value,
           in_service_since: elements.batteryInServiceSince.value,
           protected: elements.batteryProtected.checked,
+          chemistry_detail: elements.batteryChemistryDetail.value,
+          weight_g: optionalNumber(elements.batteryWeight),
+          nominal_voltage_v: optionalNumber(elements.batteryNominalVoltage),
+          min_voltage_v: optionalNumber(elements.batteryMinVoltage),
+          max_voltage_v: optionalNumber(elements.batteryMaxVoltage),
+          max_charge_current_a: optionalNumber(elements.batteryMaxChargeCurrent),
+          max_discharge_current_a: optionalNumber(elements.batteryMaxDischargeCurrent),
+          cycle_life: optionalNumber(elements.batteryCycleLife),
+          manufacture_year: optionalNumber(elements.batteryManufactureYear),
+          dimensions: elements.batteryDimensions.value,
+          data_source_name: elements.batteryDataSourceName.value,
+          data_source_url: elements.batteryDataSourceUrl.value,
+          data_source_retrieved_at: elements.batteryDataSourceRetrievedAt.value,
+          technical_notes: elements.batteryTechnicalNotes.value,
+          technical_data: appState.batteryTechnicalData,
           notes: elements.batteryNotes.value,
           archived: elements.batteryForm.dataset.archived === "true",
         }),
@@ -1279,6 +1327,51 @@ elements.batteryForm.addEventListener("submit", async (event) => {
   } catch (error) {
     showToast(error.message, true);
   }
+});
+
+elements.cellCatalogForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (demoMode) {
+    showToast("Der Demo-Modus ist schreibgeschützt", true);
+    return;
+  }
+  const sources = [...elements.cellCatalogSources.querySelectorAll(
+    'input[name="cellCatalogSource"]:checked',
+  )].map((input) => input.value);
+  if (!sources.length) {
+    showToast("Mindestens eine Katalogquelle auswählen", true);
+    return;
+  }
+  elements.cellCatalogImportButton.disabled = true;
+  elements.cellCatalogImportButton.textContent = "Quellen werden eingelesen…";
+  try {
+    const result = await api("/api/cell-catalog/import", {
+      method: "POST",
+      body: JSON.stringify({ sources }),
+    });
+    await loadCellCatalogSources();
+    const imported = result.results
+      .filter((item) => item.status === "ok")
+      .reduce((sum, item) => sum + item.entry_count, 0);
+    const failed = result.results.filter((item) => item.status !== "ok").length;
+    showToast(
+      failed
+        ? `${formatInteger(imported)} Einträge aktualisiert, ${failed} Quelle(n) mit Fehler`
+        : `${formatInteger(imported)} Katalogeinträge aktualisiert`,
+      Boolean(failed),
+    );
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    elements.cellCatalogImportButton.disabled = false;
+    elements.cellCatalogImportButton.textContent = "Ausgewählte Quellen einlesen";
+  }
+});
+
+elements.cellCatalogSearch.addEventListener("keydown", async (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  await searchCellCatalog();
 });
 
 elements.batteryLookupForm.addEventListener("submit", async (event) => {
@@ -2147,6 +2240,130 @@ async function deleteProfile(profileId) {
   showToast("Profil wurde gelöscht");
 }
 
+function optionalNumber(input) {
+  const value = input.value.trim();
+  return value === "" ? null : Number(value);
+}
+
+function setOptionalValue(input, value) {
+  input.value = value == null ? "" : String(value);
+}
+
+async function loadCellCatalogSources() {
+  const data = await api("/api/cell-catalog/sources");
+  appState.cellCatalogSources = data.sources || [];
+  renderCellCatalogSources(data.total_entries || 0);
+}
+
+function renderCellCatalogSources(totalEntries = 0) {
+  elements.cellCatalogSources.innerHTML = appState.cellCatalogSources.map((source) => {
+    const status = source.status === "never"
+      ? "Noch nicht eingelesen"
+      : source.status === "error"
+        ? `Letzter Versuch fehlgeschlagen · ${formatInteger(source.entry_count)} Einträge bleiben erhalten`
+        : `${formatInteger(source.entry_count)} Einträge · ${formatDateTime(source.last_imported_at)}`;
+    return `
+      <label class="cell-catalog-source ${source.status}">
+        <input type="checkbox" name="cellCatalogSource" value="${escapeHtml(source.source_key)}" checked>
+        <span>
+          <strong>${escapeHtml(source.source_name)}</strong>
+          <small>${escapeHtml(status)}</small>
+          ${source.last_error ? `<small class="catalog-error">${escapeHtml(source.last_error)}</small>` : ""}
+        </span>
+        <a href="${escapeHtml(source.source_url)}" target="_blank" rel="noreferrer">Quelle</a>
+      </label>
+    `;
+  }).join("");
+  elements.cellCatalogSummary.textContent = totalEntries
+    ? `${formatInteger(totalEntries)} Einträge im lokalen Katalog`
+    : "Noch kein lokaler Katalog vorhanden.";
+}
+
+async function searchCellCatalog() {
+  const query = elements.cellCatalogSearch.value.trim();
+  if (query.length < 2) {
+    elements.cellCatalogResults.innerHTML = '<p class="form-note">Mindestens zwei Zeichen eingeben.</p>';
+    return;
+  }
+  elements.cellCatalogResults.innerHTML = '<p class="form-note">Lokaler Katalog wird durchsucht…</p>';
+  const data = await api(`/api/cell-catalog/search?q=${encodeURIComponent(query)}&limit=30`);
+  appState.cellCatalogResults = data.entries || [];
+  renderCellCatalogResults();
+}
+
+function renderCellCatalogResults() {
+  elements.cellCatalogResults.innerHTML = appState.cellCatalogResults.length
+    ? appState.cellCatalogResults.map((entry) => {
+      const facts = [
+        entry.form_factor,
+        entry.chemistry,
+        entry.nominal_capacity_mah == null
+          ? ""
+          : `${formatInteger(entry.nominal_capacity_mah)} mAh`,
+        entry.weight_g == null ? "" : `${formatNumber(entry.weight_g, 1)} g`,
+      ].filter(Boolean).join(" · ");
+      return `
+        <div class="cell-catalog-result">
+          <span>
+            <strong>${escapeHtml(entry.title)}</strong>
+            <small>${escapeHtml(facts || "Keine normalisierten technischen Werte")}</small>
+            <small>${escapeHtml(entry.source_name)}</small>
+          </span>
+          <button type="button" data-action="use-cell-catalog-entry" data-catalog-entry-id="${entry.id}">Übernehmen</button>
+        </div>
+      `;
+    }).join("")
+    : '<p class="form-note">Keine passenden Einträge im lokalen Katalog.</p>';
+}
+
+function useCellCatalogEntry(entryId) {
+  const entry = appState.cellCatalogResults.find((item) => item.id === entryId);
+  if (!entry) return;
+  if (entry.manufacturer) elements.batteryManufacturer.value = entry.manufacturer;
+  if (entry.model) elements.batteryModel.value = entry.model;
+  if (entry.form_factor) elements.batteryFormFactor.value = entry.form_factor;
+  if (
+    Number.isInteger(entry.nominal_capacity_mah)
+    && entry.nominal_capacity_mah >= 100
+    && entry.nominal_capacity_mah <= 50000
+  ) {
+    elements.batteryCapacity.value = String(entry.nominal_capacity_mah);
+  }
+  if ([0, 1].includes(entry.battery_type_code)) {
+    elements.batteryType.value = String(entry.battery_type_code);
+  }
+  elements.batteryChemistryDetail.value = entry.chemistry || "";
+  setOptionalValue(elements.batteryWeight, entry.weight_g);
+  setOptionalValue(elements.batteryNominalVoltage, entry.nominal_voltage_v);
+  setOptionalValue(elements.batteryMinVoltage, entry.min_voltage_v);
+  setOptionalValue(elements.batteryMaxVoltage, entry.max_voltage_v);
+  setOptionalValue(elements.batteryMaxChargeCurrent, entry.max_charge_current_a);
+  setOptionalValue(elements.batteryMaxDischargeCurrent, entry.max_discharge_current_a);
+  setOptionalValue(elements.batteryCycleLife, entry.cycle_life);
+  setOptionalValue(elements.batteryManufactureYear, entry.manufacture_year);
+  elements.batteryDimensions.value = entry.dimensions || "";
+  elements.batteryDataSourceName.value = entry.source_name || "";
+  elements.batteryDataSourceUrl.value = entry.source_url || "";
+  elements.batteryDataSourceRetrievedAt.value = entry.imported_at || "";
+  appState.batteryTechnicalData = { ...(entry.details || {}) };
+  renderBatteryTechnicalData();
+  showToast("Katalogwerte übernommen. Zellaufdruck und Datenblatt vor dem Speichern prüfen.");
+}
+
+function renderBatteryTechnicalData() {
+  const rows = Object.entries(appState.batteryTechnicalData || {});
+  elements.batteryTechnicalData.innerHTML = rows.length
+    ? `
+      <details>
+        <summary>${formatInteger(rows.length)} übernommene Quellenfelder</summary>
+        <dl>${rows.map(([key, value]) => `
+          <div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd></div>
+        `).join("")}</dl>
+      </details>
+    `
+    : "";
+}
+
 async function loadBatteries() {
   const data = await api(
     appState.showArchivedBatteries
@@ -2277,6 +2494,27 @@ function openBatteryDialog(battery = null) {
   elements.batteryOrigin.value = battery?.origin || "";
   elements.batteryInServiceSince.value = battery?.in_service_since || "";
   elements.batteryProtected.checked = Boolean(battery?.protected);
+  elements.batteryChemistryDetail.value = battery?.chemistry_detail || "";
+  setOptionalValue(elements.batteryWeight, battery?.weight_g);
+  setOptionalValue(elements.batteryNominalVoltage, battery?.nominal_voltage_v);
+  setOptionalValue(elements.batteryMinVoltage, battery?.min_voltage_v);
+  setOptionalValue(elements.batteryMaxVoltage, battery?.max_voltage_v);
+  setOptionalValue(elements.batteryMaxChargeCurrent, battery?.max_charge_current_a);
+  setOptionalValue(elements.batteryMaxDischargeCurrent, battery?.max_discharge_current_a);
+  setOptionalValue(elements.batteryCycleLife, battery?.cycle_life);
+  setOptionalValue(elements.batteryManufactureYear, battery?.manufacture_year);
+  elements.batteryDimensions.value = battery?.dimensions || "";
+  elements.batteryDataSourceName.value = battery?.data_source_name || "";
+  elements.batteryDataSourceUrl.value = battery?.data_source_url || "";
+  elements.batteryDataSourceRetrievedAt.value = battery?.data_source_retrieved_at || "";
+  elements.batteryTechnicalNotes.value = battery?.technical_notes || "";
+  appState.batteryTechnicalData = { ...(battery?.technical_data || {}) };
+  appState.cellCatalogResults = [];
+  elements.cellCatalogSearch.value = battery?.manufacturer && battery?.model
+    ? `${battery.manufacturer} ${battery.model}`
+    : "";
+  elements.cellCatalogResults.innerHTML = "";
+  renderBatteryTechnicalData();
   elements.batteryNotes.value = battery?.notes || "";
   elements.batteryDialog.showModal();
   elements.batteryCode.focus();
@@ -2355,9 +2593,48 @@ function renderBatteryDetail() {
       <small>${formatInteger(statistics.capacity_test_count || 0)} Kapazitätstests</small>
     </div>
   `;
+  renderBatteryTechnicalSummary(battery);
   renderBatteryRuns();
   renderBatteryComparisonLegend(null);
   requestAnimationFrame(() => drawBatteryComparison(null));
+}
+
+function renderBatteryTechnicalSummary(battery) {
+  const facts = [
+    battery.chemistry_detail ? ["Chemiedetail", battery.chemistry_detail] : null,
+    battery.weight_g == null ? null : ["Gewicht", `${formatNumber(battery.weight_g, 2)} g`],
+    battery.nominal_voltage_v == null ? null : ["Nennspannung", `${formatNumber(battery.nominal_voltage_v, 3)} V`],
+    battery.min_voltage_v == null ? null : ["Min. Spannung", `${formatNumber(battery.min_voltage_v, 3)} V`],
+    battery.max_voltage_v == null ? null : ["Max. Spannung", `${formatNumber(battery.max_voltage_v, 3)} V`],
+    battery.max_charge_current_a == null ? null : ["Max. Ladestrom", `${formatNumber(battery.max_charge_current_a, 2)} A`],
+    battery.max_discharge_current_a == null ? null : ["Max. Entladestrom", `${formatNumber(battery.max_discharge_current_a, 2)} A`],
+    battery.cycle_life == null ? null : ["Zyklen", formatInteger(battery.cycle_life)],
+    battery.manufacture_year == null ? null : ["Jahr", formatInteger(battery.manufacture_year)],
+    battery.dimensions ? ["Abmessungen", battery.dimensions] : null,
+  ].filter(Boolean);
+  const source = battery.data_source_url
+    ? `<a href="${escapeHtml(battery.data_source_url)}" target="_blank" rel="noreferrer">${escapeHtml(battery.data_source_name || "Quelldatensatz")}</a>`
+    : battery.data_source_name
+      ? escapeHtml(battery.data_source_name)
+      : "";
+  const sourceRows = Object.entries(battery.technical_data || {});
+  const hasContent = facts.length || source || battery.technical_notes || sourceRows.length;
+  elements.batteryTechnicalSummary.hidden = !hasContent;
+  elements.batteryTechnicalSummary.innerHTML = hasContent
+    ? `
+      <div class="battery-technical-facts">
+        ${facts.map(([label, value]) => `<span><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong></span>`).join("")}
+      </div>
+      ${source ? `<p><strong>Datenquelle:</strong> ${source}${battery.data_source_retrieved_at ? ` · abgerufen ${escapeHtml(formatDateTime(battery.data_source_retrieved_at))}` : ""}</p>` : ""}
+      ${battery.technical_notes ? `<p>${escapeHtml(battery.technical_notes)}</p>` : ""}
+      ${sourceRows.length ? `
+        <details>
+          <summary>${formatInteger(sourceRows.length)} gespeicherte Quellenfelder</summary>
+          <dl>${sourceRows.map(([key, value]) => `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl>
+        </details>
+      ` : ""}
+    `
+    : "";
 }
 
 function renderBatteryRuns() {

@@ -38,7 +38,7 @@ ssh pi@mc3000-pi.local
 
 ## 2. Installationsquelle wählen
 
-MC3000 Control kann als fest versioniertes Release oder direkt aus dem aktuellen
+Open MC3000 Control kann als fest versioniertes Release oder direkt aus dem aktuellen
 Git-Stand installiert werden. Für einen normalen Einsatz wird das Release empfohlen.
 
 ### Variante A: stabiles Release installieren (empfohlen)
@@ -184,7 +184,7 @@ dabei grundsätzlich nicht gelöscht.
 ## 6. Ladeprofile verwalten
 
 Die Profile der offiziellen Handy-App werden auf dem Handy gespeichert. Sie lassen sich
-nicht aus dem Ladegerät in MC3000 Control importieren. Die Weboberfläche verwaltet deshalb
+nicht aus dem Ladegerät in Open MC3000 Control importieren. Die Weboberfläche verwaltet deshalb
 eine eigene Profilbibliothek auf dem Raspberry Pi:
 
 1. `Profile` öffnen.

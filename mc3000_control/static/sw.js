@@ -1,13 +1,13 @@
 "use strict";
 
-const CACHE = "mc3000-control-v1.0.0";
+const CACHE = "mc3000-control-v1.0.0-102";
 const SHELL = [
   "/",
-  "/static/style.css?v=100",
-  "/static/theme-init.js?v=100",
-  "/static/i18n.js?v=100",
-  "/static/demo.js?v=100",
-  "/static/app.js?v=100",
+  "/static/style.css?v=102",
+  "/static/theme-init.js?v=102",
+  "/static/i18n.js?v=102",
+  "/static/demo.js?v=102",
+  "/static/app.js?v=102",
   "/static/favicon.svg",
   "/static/icon-192.png",
   "/static/icon-512.png",
