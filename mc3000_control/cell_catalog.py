@@ -12,12 +12,15 @@ from html.parser import HTMLParser
 from http.client import HTTPException as HTTPClientError
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin
-from urllib.request import Request, urlopen
-from xml.etree import ElementTree
+from urllib.parse import urljoin, urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from zipfile import BadZipFile, ZipFile
 
+from defusedxml import ElementTree
+from defusedxml.common import DefusedXmlException
+
 MAX_CATALOG_DOWNLOAD_BYTES = 12 * 1024 * 1024
+MAX_XLSX_XML_BYTES = 32 * 1024 * 1024
 CATALOG_TIMEOUT_SECONDS = 30
 USER_AGENT = "OMC/1.0 (+https://github.com/x3muha/mc3000-control)"
 
@@ -48,10 +51,20 @@ CATALOG_SOURCES = {
         "parser": "lygte",
     },
 }
+CATALOG_SOURCE_HOSTS = frozenset(
+    urlsplit(source["download_url"]).hostname
+    for source in CATALOG_SOURCES.values()
+)
 
 
 class CatalogImportError(RuntimeError):
     pass
+
+
+class _CatalogRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _validate_catalog_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 @dataclass(frozen=True, slots=True)
@@ -480,9 +493,12 @@ def import_catalog_sources(
 
 
 def fetch_catalog_url(url: str) -> bytes:
+    _validate_catalog_url(url)
     request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
+    opener = build_opener(_CatalogRedirectHandler())
     try:
-        with urlopen(request, timeout=CATALOG_TIMEOUT_SECONDS) as response:
+        with opener.open(request, timeout=CATALOG_TIMEOUT_SECONDS) as response:
+            _validate_catalog_url(response.geturl())
             declared_size = response.headers.get("Content-Length")
             if declared_size and int(declared_size) > MAX_CATALOG_DOWNLOAD_BYTES:
                 raise CatalogImportError("Katalogdatei ist größer als erlaubt")
@@ -494,6 +510,22 @@ def fetch_catalog_url(url: str) -> bytes:
     if len(payload) > MAX_CATALOG_DOWNLOAD_BYTES:
         raise CatalogImportError("Katalogdatei ist größer als erlaubt")
     return payload
+
+
+def _validate_catalog_url(url: str) -> None:
+    try:
+        parsed = urlsplit(url)
+        port = parsed.port
+    except ValueError as exc:
+        raise CatalogImportError("Katalogquelle hat eine ungültige URL") from exc
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname not in CATALOG_SOURCE_HOSTS
+        or port not in {None, 443}
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
+        raise CatalogImportError("Katalogquelle ist nicht freigegeben")
 
 
 def parse_betterbat(payload: bytes) -> list[CatalogEntry]:
@@ -704,14 +736,16 @@ def _xlsx_rows(payload: bytes) -> list[dict[str, str]]:
             shared = []
             if "xl/sharedStrings.xml" in archive.namelist():
                 shared_root = ElementTree.fromstring(
-                    archive.read("xl/sharedStrings.xml")
+                    _read_xlsx_member(archive, "xl/sharedStrings.xml")
                 )
                 shared = [
                     "".join(node.itertext())
                     for node in shared_root.findall(f"{namespace}si")
                 ]
-            sheet = ElementTree.fromstring(archive.read("xl/worksheets/sheet1.xml"))
-    except (BadZipFile, KeyError, ElementTree.ParseError) as exc:
+            sheet = ElementTree.fromstring(
+                _read_xlsx_member(archive, "xl/worksheets/sheet1.xml")
+            )
+    except (BadZipFile, KeyError, ElementTree.ParseError, DefusedXmlException) as exc:
         raise CatalogImportError("XLSX-Datei konnte nicht gelesen werden") from exc
 
     raw_rows: list[dict[str, str]] = []
@@ -741,6 +775,13 @@ def _xlsx_rows(payload: bytes) -> list[dict[str, str]]:
         {header: row.get(column, "") for column, header in headers.items() if header}
         for row in raw_rows[1:]
     ]
+
+
+def _read_xlsx_member(archive: ZipFile, name: str) -> bytes:
+    member = archive.getinfo(name)
+    if member.file_size > MAX_XLSX_XML_BYTES:
+        raise CatalogImportError("XLSX-Inhalt ist größer als erlaubt")
+    return archive.read(member)
 
 
 def _catalog_entry_from_row(row: sqlite3.Row) -> StoredCatalogEntry:

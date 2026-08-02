@@ -3,18 +3,58 @@ from __future__ import annotations
 import io
 from zipfile import ZIP_DEFLATED, ZipFile
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
+from mc3000_control import cell_catalog
 from mc3000_control.app import create_app
 from mc3000_control.cell_catalog import (
     CATALOG_SOURCES,
     CatalogEntry,
+    CatalogImportError,
     CellCatalogStore,
+    fetch_catalog_url,
     import_catalog_sources,
     parse_betterbat,
     parse_lygte,
     parse_second_life_storage,
 )
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "file:///etc/passwd",
+        "http://zenodo.org/records/10679242",
+        "https://example.com/catalog.xlsx",
+        "https://zenodo.org:444/records/10679242",
+    ],
+)
+def test_catalog_download_rejects_unapproved_urls(url: str) -> None:
+    with pytest.raises(CatalogImportError, match="nicht freigegeben"):
+        fetch_catalog_url(url)
+
+
+def test_betterbat_xlsx_rejects_xml_entities() -> None:
+    sheet = b"""<?xml version="1.0"?>
+    <!DOCTYPE worksheet [<!ENTITY payload "not allowed">]>
+    <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+      <sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>&payload;</t></is></c>
+      </row></sheetData>
+    </worksheet>"""
+    output = io.BytesIO()
+    with ZipFile(output, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("xl/worksheets/sheet1.xml", sheet)
+
+    with pytest.raises(CatalogImportError, match="XLSX-Datei"):
+        parse_betterbat(output.getvalue())
+
+
+def test_betterbat_xlsx_rejects_oversized_xml(monkeypatch) -> None:
+    monkeypatch.setattr(cell_catalog, "MAX_XLSX_XML_BYTES", 32)
+
+    with pytest.raises(CatalogImportError, match="größer als erlaubt"):
+        parse_betterbat(_xlsx(["Product_Number"], ["INR21700-40T"]))
 
 
 def test_betterbat_xlsx_is_normalized_and_preserves_source_fields() -> None:

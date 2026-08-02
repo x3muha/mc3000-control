@@ -12,6 +12,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 dependencies = [
   "bleak>=3.0,<4",
+  "defusedxml>=0.7,<1",
   "fastapi>=0.115,<1",
   "segno>=1.6,<2",
   "reportlab>=4.2,<5",
