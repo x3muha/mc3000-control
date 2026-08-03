@@ -12,7 +12,8 @@ Bluetooth-Verbindungen. Sie starten kein reales Lade- oder Entladeprogramm.
 
 - `test_protocol.py` prüft MC3000-Paketaufbau, Prüfsummen, Statuswerte und Kurvendaten.
 - `test_profiles.py` prüft Profilgrenzen, Zeitlimits und das 40-Byte-Profilformat.
-- `test_ble_profile.py` simuliert Profilübertragung, Start, Stopp und Slotzuordnungen.
+- `test_ble_profile.py` simuliert Profilübertragung, Start, Stopp, Slotzuordnungen und
+  die spannungsbasierte, entprellte Batterieentnahme.
 - `test_device_manager.py` prüft Suche, Verbindungsverwaltung und sicheres Entfernen.
 - `test_registry.py` prüft das Geräteverzeichnis und gültige Bluetooth-Adressen.
 - `test_battery_manager.py` prüft Batterieakten, C-Raten und automatisch erzeugte

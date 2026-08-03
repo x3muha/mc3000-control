@@ -23,6 +23,8 @@ More views: [dark dashboard](docs/images/dashboard-dark.png) ·
 - Charging profiles, categories, capacity-based programs and portable JSON exchange
 - Battery records with weight, voltage range, current limits, dimensions, source links,
   reusable identifiers, QR labels, PDF sheets and permanent deletion
+- Battery and program assignments remain visible after completion until the inactive
+  slot detects removal from zero voltage or a debounced major voltage collapse
 - Explicitly manual local cell-catalog imports from BetterBat/Zenodo, Second Life
   Storage and Lygte, followed by local model search and deliberate field transfer
 - Program history, phase-aware charts, capacity/SOH reports, PDF and CSV exports

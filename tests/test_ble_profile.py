@@ -179,7 +179,7 @@ async def test_start_is_rejected_without_selected_program(tmp_path) -> None:
         await session.start_slot(1)
 
 
-async def test_battery_assignment_is_cleared_after_run_ends(tmp_path) -> None:
+async def test_battery_assignment_is_retained_until_voltage_collapse(tmp_path) -> None:
     path = tmp_path / "mc3000.db"
     profiles = ProfileStore(path)
     batteries = BatteryStore(path)
@@ -243,9 +243,125 @@ async def test_battery_assignment_is_cleared_after_run_ends(tmp_path) -> None:
 
     await session._record_if_due()
 
+    assert session.snapshot()["battery_ids"] == {1: battery.id}
+    assert session.snapshot()["profile_ids"] == {1: profile.id}
+    assert session.snapshot()["programs"][1]["battery_id"] == battery.id
+    assert batteries.assignments_for(session.address) == {1: battery.id}
+    assert profiles.assignments_for(session.address) == {1: profile.id}
+    assert profiles.programs_for(session.address)[1]["battery_id"] == battery.id
+
+    await session._reconcile_battery_presence()
+    session.slots[0]["voltage_v"] = 2.8
+    await session._reconcile_battery_presence()
+
+    assert session.snapshot()["battery_ids"] == {1: battery.id}
+
+    session.slots[0]["voltage_v"] = 0.6
+    await session._reconcile_battery_presence()
+
+    assert session.snapshot()["battery_ids"] == {1: battery.id}
+
+    await session._reconcile_battery_presence()
+
     assert session.snapshot()["battery_ids"] == {}
     assert session.snapshot()["profile_ids"] == {}
     assert session.snapshot()["programs"] == {}
     assert batteries.assignments_for(session.address) == {}
+    assert profiles.assignments_for(session.address) == {}
+    assert profiles.programs_for(session.address) == {}
+
+
+async def test_zero_voltage_clears_persisted_battery_assignment_immediately(
+    tmp_path,
+) -> None:
+    path = tmp_path / "mc3000.db"
+    profiles = ProfileStore(path)
+    batteries = BatteryStore(path)
+    measurements = MeasurementStore(path)
+    battery = batteries.save(
+        BatteryValues(
+            code="001",
+            name="",
+            battery_type_code=0,
+            nominal_capacity_mah=2000,
+            notes="",
+        )
+    )
+    batteries.assign("AA:BB:CC:DD:EE:FF", 1, battery.id)
+
+    async def changed() -> None:
+        pass
+
+    session = DeviceSession(
+        RegisteredDevice("AA:BB:CC:DD:EE:FF", "Test", True, False),
+        changed,
+        profiles,
+        batteries,
+        measurements,
+    )
+    session.slots[0] = {"active": False, "voltage_v": 0.0}
+
+    await session._reconcile_battery_presence()
+
+    assert session.snapshot()["battery_ids"] == {}
+    assert batteries.assignments_for(session.address) == {}
+
+
+async def test_program_without_battery_record_is_cleared_after_run(tmp_path) -> None:
+    path = tmp_path / "mc3000.db"
+    profiles = ProfileStore(path)
+    batteries = BatteryStore(path)
+    measurements = MeasurementStore(path)
+    profile = profiles.list()[0]
+    profiles.assign("AA:BB:CC:DD:EE:FF", [1], profile.id)
+    profiles.set_slot_program(
+        "AA:BB:CC:DD:EE:FF",
+        1,
+        source="profile",
+        label=profile.values.name,
+        details=profile.to_dict(),
+        battery_id=None,
+        profile_id=profile.id,
+    )
+    active_slot = {
+        "battery_type_code": 0,
+        "mode_code": 0,
+        "cycle_count": 0,
+        "status_code": 1,
+        "active": True,
+        "time_s": 10,
+        "voltage_v": 4.1,
+        "current_a": 1.0,
+        "capacity_mah": 100,
+        "temperature_c": 27,
+        "resistance_mohm": 40,
+    }
+    run_ids = measurements.record_snapshot(
+        "AA:BB:CC:DD:EE:FF",
+        datetime.now(UTC).isoformat(),
+        [active_slot, None, None, None],
+        [None, None, None, None],
+        {1: profile.id},
+        {},
+    )
+
+    async def changed() -> None:
+        pass
+
+    session = DeviceSession(
+        RegisteredDevice("AA:BB:CC:DD:EE:FF", "Test", True, False),
+        changed,
+        profiles,
+        batteries,
+        measurements,
+    )
+    session.slots = [{**active_slot, "active": False, "status_code": 4}] * 4
+    session._run_ids = run_ids
+
+    await session._record_if_due()
+
+    assert session.snapshot()["battery_ids"] == {}
+    assert session.snapshot()["profile_ids"] == {}
+    assert session.snapshot()["programs"] == {}
     assert profiles.assignments_for(session.address) == {}
     assert profiles.programs_for(session.address) == {}

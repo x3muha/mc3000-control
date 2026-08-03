@@ -70,6 +70,9 @@ Weitere Ansichten: [Dashboard im Darkmode](docs/images/dashboard-dark.png) ·
   freie technische Zusatzangaben
 - Datum „In Betrieb seit“, Protection-Kennzeichen und freie Notizen
 - Eingabevorschläge aus vorhandenen Batterieakten
+- Batterie- und Programmzuordnung bleiben nach Programmende sichtbar, bis der
+  inaktive Slot über 0 V beziehungsweise einen entprellten starken
+  Spannungseinbruch die Entnahme erkennt
 - Ausschließlich manuell ausgelöster Import eines lokalen Zellkatalogs aus
   BetterBat/Zenodo, Second Life Storage und Lygte
 - Lokale Modell-Suche mit bewusster Übernahme ausgewählter Katalogwerte und

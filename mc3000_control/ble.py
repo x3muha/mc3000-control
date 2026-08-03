@@ -19,6 +19,12 @@ from .storage import BatteryStore, MeasurementStore, ProfileStore
 LOGGER = logging.getLogger(__name__)
 ChangeCallback = Callable[[], Awaitable[None]]
 
+# Removal is evaluated only for inactive slots. A zero reading is unambiguous;
+# non-zero contact-loss readings must stay at or below one quarter of the last
+# credible voltage for two complete polling cycles before an assignment is released.
+BATTERY_REMOVAL_VOLTAGE_RATIO = 0.25
+BATTERY_REMOVAL_CONFIRMATIONS = 2
+
 
 @dataclass(slots=True)
 class DiscoveredDevice:
@@ -74,6 +80,8 @@ class DeviceSession:
         self._run_ids: list[int | None] = [None] * protocol.SLOT_COUNT
         self._profile_ids = profile_store.assignments_for(registration.address)
         self._battery_ids = battery_store.assignments_for(registration.address)
+        self._battery_reference_voltage_v: dict[int, float] = {}
+        self._battery_removal_counts: dict[int, int] = {}
         self._programs = profile_store.programs_for(registration.address)
         for slot, profile_id in self._profile_ids.items():
             if slot in self._programs:
@@ -302,8 +310,13 @@ class DeviceSession:
             self._profile_ids[slot] = profile_id
         if battery_id is None:
             self._battery_ids.pop(slot, None)
+            self._reset_battery_presence_tracking(slot)
         else:
             self._battery_ids[slot] = battery_id
+            self._reset_battery_presence_tracking(slot)
+            current = self.slots[slot - 1]
+            if current is not None and float(current.get("voltage_v", 0)) > 0:
+                self._battery_reference_voltage_v[slot] = float(current["voltage_v"])
         self._programs[slot] = dict(program)
 
     def clear_battery_assignment(self, battery_id: int) -> None:
@@ -318,6 +331,7 @@ class DeviceSession:
             if assigned_id != battery_id
         }
         for slot in cleared_slots:
+            self._reset_battery_presence_tracking(slot)
             self._profile_ids.pop(slot, None)
             self._programs.pop(slot, None)
 
@@ -423,6 +437,7 @@ class DeviceSession:
 
             self.last_update = datetime.now(UTC).isoformat()
             await self._record_if_due()
+            await self._reconcile_battery_presence()
             await self._notify_change()
 
     async def _poll_slot(self, slot: int) -> None:
@@ -547,26 +562,108 @@ class DeviceSession:
             dict(self._battery_ids),
         )
         if ended_slots:
+            untracked_slots = [
+                slot for slot in ended_slots if slot not in self._battery_ids
+            ]
+            if untracked_slots:
+                await asyncio.to_thread(
+                    self.profile_store.clear_assignments,
+                    self.address,
+                    untracked_slots,
+                )
+                await asyncio.to_thread(
+                    self.profile_store.clear_slot_programs,
+                    self.address,
+                    untracked_slots,
+                )
+            for slot in untracked_slots:
+                self._profile_ids.pop(slot, None)
+                self._programs.pop(slot, None)
+        self._last_recorded_at = now
+
+    async def _reconcile_battery_presence(self) -> None:
+        removed_slots: list[int] = []
+        assigned_slots = set(self._battery_ids)
+        for slot in list(self._battery_reference_voltage_v):
+            if slot not in assigned_slots:
+                self._reset_battery_presence_tracking(slot)
+
+        for slot in sorted(assigned_slots):
+            current = self.slots[slot - 1]
+            if current is None:
+                continue
+            voltage_v = float(current.get("voltage_v", 0))
+            if current.get("active"):
+                if voltage_v > 0:
+                    self._battery_reference_voltage_v[slot] = voltage_v
+                self._battery_removal_counts.pop(slot, None)
+                continue
+            if voltage_v <= 0:
+                removed_slots.append(slot)
+                continue
+
+            reference_v = self._battery_reference_voltage_v.get(slot)
+            if reference_v is None or reference_v <= 0:
+                self._battery_reference_voltage_v[slot] = voltage_v
+                self._battery_removal_counts.pop(slot, None)
+                continue
+
+            significant_drop = voltage_v <= reference_v * BATTERY_REMOVAL_VOLTAGE_RATIO
+            if significant_drop:
+                confirmations = self._battery_removal_counts.get(slot, 0) + 1
+                self._battery_removal_counts[slot] = confirmations
+                if confirmations >= BATTERY_REMOVAL_CONFIRMATIONS:
+                    removed_slots.append(slot)
+                continue
+
+            self._battery_removal_counts.pop(slot, None)
+
+        if not removed_slots:
+            return
+
+        async with self._configuration_lock:
+            removed_slots = [
+                slot
+                for slot in removed_slots
+                if slot in self._battery_ids
+                and (
+                    float((self.slots[slot - 1] or {}).get("voltage_v", 0)) <= 0
+                    or self._battery_removal_counts.get(slot, 0)
+                    >= BATTERY_REMOVAL_CONFIRMATIONS
+                )
+            ]
+            if not removed_slots:
+                return
             await asyncio.to_thread(
                 self.battery_store.clear_assignments,
                 self.address,
-                ended_slots,
+                removed_slots,
             )
             await asyncio.to_thread(
                 self.profile_store.clear_assignments,
                 self.address,
-                ended_slots,
+                removed_slots,
             )
             await asyncio.to_thread(
                 self.profile_store.clear_slot_programs,
                 self.address,
-                ended_slots,
+                removed_slots,
             )
-            for slot in ended_slots:
-                self._battery_ids.pop(slot, None)
+            for slot in removed_slots:
+                battery_id = self._battery_ids.pop(slot, None)
                 self._profile_ids.pop(slot, None)
                 self._programs.pop(slot, None)
-        self._last_recorded_at = now
+                self._reset_battery_presence_tracking(slot)
+                LOGGER.info(
+                    "%s: Batteriezuordnung %s in Slot %s nach Entnahmeerkennung gelöst",
+                    self.address,
+                    battery_id,
+                    slot,
+                )
+
+    def _reset_battery_presence_tracking(self, slot: int) -> None:
+        self._battery_reference_voltage_v.pop(slot, None)
+        self._battery_removal_counts.pop(slot, None)
 
     def _on_notification(self, _sender: Any, data: bytearray) -> None:
         self._notifications.put_nowait(bytes(data))

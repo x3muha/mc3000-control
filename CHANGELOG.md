@@ -5,6 +5,9 @@ version 1.0.0 onward.
 
 ## Unreleased
 
+- Keep each battery record and selected program assigned after run completion until
+  the inactive slot detects removal from zero voltage or a debounced major voltage
+  collapse.
 - Add generated third-party runtime notices and a CI license allowlist check.
 - Harden manual catalog downloads with an HTTPS source allowlist, protected XML
   parsing and bounded decompression of XLSX members.
