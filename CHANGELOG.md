@@ -5,6 +5,7 @@ version 1.0.0 onward.
 
 ## Unreleased
 
+- Add generated third-party runtime notices and a CI license allowlist check.
 - Harden manual catalog downloads with an HTTPS source allowlist, protected XML
   parsing and bounded decompression of XLSX members.
 - Rename the visible product to Open MC3000 Control, with OMC as its compact and

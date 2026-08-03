@@ -57,9 +57,10 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install '.[test,audit]'
-      - run: ruff check mc3000_control tests
+      - run: ruff check mc3000_control tests scripts/third_party_notices.py
       - run: bandit -q -r mc3000_control -x mc3000_control/static -s B608
       - run: pip-audit --local --progress-spinner off
+      - run: python scripts/third_party_notices.py --check
 
   package:
     name: Build package

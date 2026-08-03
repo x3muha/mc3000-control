@@ -116,6 +116,9 @@ Contributions are described in [CONTRIBUTING.md](CONTRIBUTING.md), releases in
 [CHANGELOG.md](CHANGELOG.md), and private vulnerability reporting in
 [SECURITY.md](SECURITY.md).
 The release gate is documented in [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md).
+Runtime dependency licenses are documented in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and checked in CI against an
+allowlist of permissive licenses.
 
 ## Safety
 
@@ -129,4 +132,5 @@ imported limits are never transferred to a charger automatically.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). Separately installed runtime dependencies retain the licenses listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

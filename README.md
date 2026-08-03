@@ -265,7 +265,11 @@ node --check mc3000_control/static/app.js
 - [Beiträge](CONTRIBUTING.md)
 - [Sicherheitsrichtlinie](SECURITY.md)
 - [Sicherheitsprüfung für Version 1.0](docs/SECURITY_REVIEW.md)
+- [Hinweise zu Drittanbieterkomponenten](THIRD_PARTY_NOTICES.md)
 
 ## Lizenz
 
-Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
+Dieses Projekt steht unter der [MIT-Lizenz](LICENSE). Die Lizenzen der separat
+installierten Laufzeitabhängigkeiten dokumentiert
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); CI prüft sie gegen eine
+Allowlist permissiver Lizenzen.

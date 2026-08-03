@@ -13,6 +13,9 @@ Contributions, protocol observations and compatibility reports are welcome.
    battery notes.
 6. Keep user-facing documentation and interface text in sync in German and English.
    Update the matching `.md` files or translation keys together in the same change.
+7. When dependencies change, install `.[audit]`, regenerate
+   `THIRD_PARTY_NOTICES.md` with `python scripts/third_party_notices.py --write`,
+   and verify it with `--check` before opening the pull request.
 
 Tests use temporary databases and simulated BLE clients. Hardware testing must be
 explicit, supervised and performed with suitable cells and safe charger settings.
